@@ -1,5 +1,5 @@
 ---
-- name: Trigger Terraform Enterprise from AAP
+- name: Trigger Terraform Enterprise VM creation from AAP
   hosts: localhost
   gather_facts: false
 
@@ -7,8 +7,6 @@
     vm_name: "demo-db-{{ lookup('pipe','date +%s') }}"
 
   tasks:
-
-    # 🔹 1. Descobrir workspace_id
     - name: Get Workspace ID
       ansible.builtin.uri:
         url: "{{ tf_hostname }}/api/v2/organizations/{{ tf_org }}/workspaces/{{ tf_workspace }}"
@@ -22,50 +20,36 @@
       ansible.builtin.set_fact:
         workspace_id: "{{ workspace_info.json.data.id }}"
 
-    - name: Update aws_key_name variable
-      uri:
-        url: "{{ tf_hostname }}/api/v2/workspaces/{{ workspace_id }}/vars/{{ aws_key_var_id }}"
-        method: PATCH
-        headers:
-          Authorization: "Bearer {{ tf_token }}"
-          Content-Type: "application/vnd.api+json"
-        body_format: json
-        body:
-          data:
-            id: "{{ aws_key_var_id }}"
-            type: vars
-            attributes:
-              value: "{{ key_name }}"
-                  # 🔹 2. Buscar variável vm_name
     - name: Get workspace variables
       ansible.builtin.uri:
-        url: "{{ tf_hostname }}/api/v2/workspaces/{{ workspace_id }}/vars"
+        url: "{{ tf_hostname }}/api/v2/workspaces/{{ workspace_id }}/vars?page%5Bsize%5D=100"
         method: GET
         headers:
           Authorization: "Bearer {{ tf_token }}"
           Content-Type: "application/vnd.api+json"
       register: workspace_vars
 
-    - name: Extract vm_name variable
+    - name: Get vm_name variable id
       ansible.builtin.set_fact:
-        vm_name_vars: >-
-          {{
-            workspace_vars.json.data
-            | selectattr('attributes.key', 'equalto', 'vm_name')
-            | selectattr('attributes.category', 'equalto', 'terraform')
-            | list
-          }}
+        vm_name_var_id: "{{ item.id }}"
+      loop: "{{ workspace_vars.json.data }}"
+      when:
+        - item.attributes.key == "vm_name"
+        - item.attributes.category == "terraform"
 
-    - name: Fail if vm_name variable does not exist
+    - name: Get aws_key_name variable id
+      ansible.builtin.set_fact:
+        aws_key_name_var_id: "{{ item.id }}"
+      loop: "{{ workspace_vars.json.data }}"
+      when:
+        - item.attributes.key == "aws_key_name"
+        - item.attributes.category == "terraform"
+
+    - name: Fail if required variables are missing
       ansible.builtin.fail:
-        msg: "Variable vm_name not found in Terraform Enterprise workspace"
-      when: vm_name_vars | length == 0
+        msg: "Missing vm_name or aws_key_name variable in TFE workspace"
+      when: vm_name_var_id is not defined or aws_key_name_var_id is not defined
 
-    - name: Set vm_name variable id
-      ansible.builtin.set_fact:
-        vm_name_var_id: "{{ vm_name_vars[0].id }}"
-
-    # 🔹 3. Atualizar variável (PATCH — não usar POST!)
     - name: Update vm_name variable
       ansible.builtin.uri:
         url: "{{ tf_hostname }}/api/v2/workspaces/{{ workspace_id }}/vars/{{ vm_name_var_id }}"
@@ -82,7 +66,22 @@
               value: "{{ vm_name }}"
         status_code: [200]
 
-    # 🔥 4. Disparar run (forçando recriação da VM)
+    - name: Update aws_key_name variable
+      ansible.builtin.uri:
+        url: "{{ tf_hostname }}/api/v2/workspaces/{{ workspace_id }}/vars/{{ aws_key_name_var_id }}"
+        method: PATCH
+        headers:
+          Authorization: "Bearer {{ tf_token }}"
+          Content-Type: "application/vnd.api+json"
+        body_format: json
+        body:
+          data:
+            id: "{{ aws_key_name_var_id }}"
+            type: vars
+            attributes:
+              value: "{{ key_name }}"
+        status_code: [200]
+
     - name: Start Terraform run
       ansible.builtin.uri:
         url: "{{ tf_hostname }}/api/v2/runs"
@@ -110,28 +109,16 @@
       ansible.builtin.set_fact:
         run_id: "{{ run_response.json.data.id }}"
 
-    # ⏳ 5. Esperar execução do Terraform
-    - name: Wait for Terraform run
-      ansible.builtin.uri:
-        url: "{{ tf_hostname }}/api/v2/runs/{{ run_id }}"
-        method: GET
-        headers:
-          Authorization: "Bearer {{ tf_token }}"
-      register: run_status
-      until: run_status.json.data.attributes.status in ["applied", "planned_and_finished"]
-      retries: 60
-      delay: 10
+    - name: Save VM name as artifact
+      ansible.builtin.set_stats:
+        data:
+          vm_name: "{{ vm_name }}"
+          run_id: "{{ run_id }}"
+        per_host: false
 
-    # ❌ Falha controlada
-    - name: Fail if Terraform did not apply
-      ansible.builtin.fail:
-        msg: "Terraform run failed with status {{ run_status.json.data.attributes.status }}"
-      when: run_status.json.data.attributes.status not in ["applied", "planned_and_finished"]
-
-    # ✅ Sucesso
-    - name: Show result
+    - name: Show Terraform run info
       ansible.builtin.debug:
         msg:
-          - "Terraform run completed"
           - "Run ID: {{ run_id }}"
           - "VM Name: {{ vm_name }}"
+          - "AWS Key Name: {{ key_name }}"
