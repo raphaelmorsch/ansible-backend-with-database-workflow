@@ -11,7 +11,7 @@
       ansible.builtin.copy:
         content: "{{ ssh_private_key }}"
         dest: "{{ key_path }}"
-        mode: '0600'
+        mode: "0600"
 
     - name: Add DB VM to inventory
       ansible.builtin.add_host:
@@ -22,11 +22,10 @@
         ansible_ssh_private_key_file: "{{ key_path }}"
         ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
 
-
 - name: Configure PostgreSQL
   hosts: db
   become: true
-  gather_facts: true
+  gather_facts: false
 
   vars:
     db_name: appdb
@@ -34,19 +33,66 @@
     db_password: "ChangeMe123!"
 
   tasks:
-
-    - name: Wait for SSH to be available
-      ansible.builtin.wait_for:
-        host: "{{ db_vm_public_ip }}"
-        port: 22
-        delay: 10
+    - name: Wait until SSH is fully usable
+      ansible.builtin.wait_for_connection:
         timeout: 300
+        delay: 20
 
-    - name: Install PostgreSQL packages
-      ansible.builtin.dnf:
-        name:
-          - postgresql-server
-        state: present
+    - name: Wait for cloud-init to finish
+      ansible.builtin.command: cloud-init status --wait
+      changed_when: false
+      failed_when: false
+
+    - name: Collect memory before install
+      ansible.builtin.command: free -m
+      register: memory_before
+      changed_when: false
+      failed_when: false
+
+    - name: Show memory before install
+      ansible.builtin.debug:
+        var: memory_before.stdout_lines
+
+    - name: Debug dnf install manually
+      ansible.builtin.command:
+        cmd: dnf -v -y install postgresql-server
+      register: dnf_debug
+      failed_when: false
+
+    - name: Show dnf return code
+      ansible.builtin.debug:
+        var: dnf_debug.rc
+
+    - name: Show dnf stdout
+      ansible.builtin.debug:
+        var: dnf_debug.stdout_lines
+
+    - name: Show dnf stderr
+      ansible.builtin.debug:
+        var: dnf_debug.stderr_lines
+
+    - name: Collect dnf and system logs
+      ansible.builtin.shell: |
+        echo "===== /var/log/dnf.log ====="
+        tail -n 100 /var/log/dnf.log || true
+        echo "===== /var/log/dnf.rpm.log ====="
+        tail -n 100 /var/log/dnf.rpm.log || true
+        echo "===== dmesg ====="
+        dmesg | tail -n 80 || true
+        echo "===== memory after dnf ====="
+        free -m || true
+      register: dnf_logs
+      changed_when: false
+      failed_when: false
+
+    - name: Show dnf/system logs
+      ansible.builtin.debug:
+        var: dnf_logs.stdout_lines
+
+    - name: Fail if dnf install failed
+      ansible.builtin.fail:
+        msg: "dnf install failed with rc={{ dnf_debug.rc }}"
+      when: dnf_debug.rc != 0
 
     - name: Initialize database
       ansible.builtin.command: postgresql-setup --initdb
@@ -71,20 +117,33 @@
         state: restarted
         enabled: true
 
-    - name: Create database
-      community.postgresql.postgresql_db:
-        name: "{{ db_name }}"
-        state: present
-      become_user: postgres
+    - name: Check if database exists
+      ansible.builtin.shell: |
+        sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='{{ db_name }}'" | grep -q 1
+      register: db_exists
+      failed_when: false
+      changed_when: false
 
-    - name: Create user
-      community.postgresql.postgresql_user:
-        name: "{{ db_user }}"
-        password: "{{ db_password }}"
-        db: "{{ db_name }}"
-        priv: "ALL"
-        state: present
-      become_user: postgres
+    - name: Create DB if not exists
+      ansible.builtin.command: >
+        sudo -u postgres psql -c "CREATE DATABASE {{ db_name }};"
+      when: db_exists.rc != 0
+
+    - name: Check if user exists
+      ansible.builtin.shell: |
+        sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='{{ db_user }}'" | grep -q 1
+      register: user_exists
+      failed_when: false
+      changed_when: false
+
+    - name: Create DB user if not exists
+      ansible.builtin.command: >
+        sudo -u postgres psql -c "CREATE USER {{ db_user }} WITH PASSWORD '{{ db_password }}';"
+      when: user_exists.rc != 0
+
+    - name: Grant privileges
+      ansible.builtin.command: >
+        sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE {{ db_name }} TO {{ db_user }};"
 
     - name: Save DB connection info as artifacts
       ansible.builtin.set_stats:
@@ -100,5 +159,6 @@
       ansible.builtin.debug:
         msg:
           - "DB Host: {{ db_vm_public_ip }}"
+          - "DB Port: 5432"
           - "DB Name: {{ db_name }}"
-          - "User: {{ db_user }}"
+          - "DB User: {{ db_user }}"
