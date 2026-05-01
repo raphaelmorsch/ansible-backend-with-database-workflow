@@ -1,30 +1,107 @@
 ---
-- name: Configure PostgreSQL
+- name: Prepare SSH access
   hosts: localhost
   gather_facts: false
 
-  tasks:
+  vars:
+    key_path: "/tmp/runtime_key"
 
-    - name: Add host dynamically
-      add_host:
+  tasks:
+    - name: Write private key to file
+      ansible.builtin.copy:
+        content: "{{ ssh_private_key }}"
+        dest: "{{ key_path }}"
+        mode: '0600'
+
+    - name: Add DB VM to inventory
+      ansible.builtin.add_host:
         name: db_vm
         groups: db
         ansible_host: "{{ db_vm_public_ip }}"
-        ansible_user: ec2-user
-        ansible_ssh_private_key_file: "/tmp/runtime_key"
+        ansible_user: "{{ db_vm_user }}"
+        ansible_ssh_private_key_file: "{{ key_path }}"
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
 
-    - name: Write private key to file
-      copy:
-        content: "{{ ssh_private_key }}"
-        dest: /tmp/runtime_key
-        mode: '0600'
+---
 
-- name: Install PostgreSQL
+- name: Configure PostgreSQL
   hosts: db
   become: true
+  gather_facts: true
+
+  vars:
+    db_name: appdb
+    db_user: appuser
+    db_password: "ChangeMe123!"
 
   tasks:
-    - name: Install PostgreSQL
-      dnf:
-        name: postgresql-server
+
+    - name: Wait for SSH to be available
+      ansible.builtin.wait_for:
+        host: "{{ db_vm_public_ip }}"
+        port: 22
+        delay: 10
+        timeout: 300
+
+    - name: Install PostgreSQL packages
+      ansible.builtin.dnf:
+        name:
+          - postgresql-server
+          - postgresql
+          - python3-psycopg2
         state: present
+
+    - name: Initialize database
+      ansible.builtin.command: postgresql-setup --initdb
+      args:
+        creates: /var/lib/pgsql/data/postgresql.conf
+
+    - name: Configure listen_addresses
+      ansible.builtin.lineinfile:
+        path: /var/lib/pgsql/data/postgresql.conf
+        regexp: "^#?listen_addresses"
+        line: "listen_addresses = '*'"
+
+    - name: Allow remote access
+      ansible.builtin.lineinfile:
+        path: /var/lib/pgsql/data/pg_hba.conf
+        line: "host all all 0.0.0.0/0 md5"
+        insertafter: EOF
+
+    - name: Start PostgreSQL
+      ansible.builtin.service:
+        name: postgresql
+        state: restarted
+        enabled: true
+
+    - name: Create database
+      community.postgresql.postgresql_db:
+        name: "{{ db_name }}"
+        state: present
+      become_user: postgres
+
+    - name: Create user
+      community.postgresql.postgresql_user:
+        name: "{{ db_user }}"
+        password: "{{ db_password }}"
+        db: "{{ db_name }}"
+        priv: "ALL"
+        state: present
+      become_user: postgres
+
+    - name: Save DB connection info as artifacts
+      ansible.builtin.set_stats:
+        data:
+          db_host: "{{ db_vm_public_ip }}"
+          db_port: "5432"
+          db_name: "{{ db_name }}"
+          db_user: "{{ db_user }}"
+          db_password: "{{ db_password }}"
+        per_host: false
+
+    - name: Show DB info
+      ansible.builtin.debug:
+        msg:
+          - "DB Host: {{ db_vm_public_ip }}"
+          - "DB Name: {{ db_name }}"
+          - "User: {{ db_user }}"
