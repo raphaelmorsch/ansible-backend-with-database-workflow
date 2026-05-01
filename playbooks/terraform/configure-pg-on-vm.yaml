@@ -1,0 +1,86 @@
+---
+- name: Configure PostgreSQL on Terraform-provisioned VM
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    db_name: appdb
+    db_user: appuser
+    db_password: "ChangeMe123!"
+
+  tasks:
+    - name: Add DB VM to dynamic inventory
+      ansible.builtin.add_host:
+        name: db_vm
+        groups: database_servers
+        ansible_host: "{{ db_vm_public_ip }}"
+        ansible_user: "{{ db_vm_user }}"
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+
+- name: Install and configure PostgreSQL
+  hosts: database_servers
+  become: true
+  gather_facts: true
+
+  vars:
+    db_name: appdb
+    db_user: appuser
+    db_password: "ChangeMe123!"
+
+  tasks:
+    - name: Install PostgreSQL packages
+      ansible.builtin.dnf:
+        name:
+          - postgresql-server
+          - postgresql
+          - python3-psycopg2
+        state: present
+
+    - name: Initialize PostgreSQL database
+      ansible.builtin.command: postgresql-setup --initdb
+      args:
+        creates: /var/lib/pgsql/data/postgresql.conf
+
+    - name: Listen on all interfaces
+      ansible.builtin.lineinfile:
+        path: /var/lib/pgsql/data/postgresql.conf
+        regexp: "^#?listen_addresses"
+        line: "listen_addresses = '*'"
+
+    - name: Allow remote PostgreSQL connections
+      ansible.builtin.lineinfile:
+        path: /var/lib/pgsql/data/pg_hba.conf
+        line: "host all all 0.0.0.0/0 md5"
+        insertafter: EOF
+
+    - name: Enable and start PostgreSQL
+      ansible.builtin.service:
+        name: postgresql
+        state: restarted
+        enabled: true
+
+    - name: Create application database
+      community.postgresql.postgresql_db:
+        name: "{{ db_name }}"
+        state: present
+      become_user: postgres
+
+    - name: Create application database user
+      community.postgresql.postgresql_user:
+        name: "{{ db_user }}"
+        password: "{{ db_password }}"
+        db: "{{ db_name }}"
+        priv: "ALL"
+        state: present
+      become_user: postgres
+
+    - name: Save DB connection data as workflow artifacts
+      ansible.builtin.set_stats:
+        data:
+          db_host: "{{ db_vm_public_ip }}"
+          db_private_ip: "{{ db_vm_private_ip }}"
+          db_port: "5432"
+          db_name: "{{ db_name }}"
+          db_user: "{{ db_user }}"
+          db_password: "{{ db_password }}"
+        per_host: false

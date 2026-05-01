@@ -47,3 +47,11 @@
           - "Public IP: {{ db_vm_public_ip }}"
           - "Private IP: {{ db_vm_private_ip }}"
           - "User: {{ db_vm_user }}"
+
+    - name: Save Terraform outputs as workflow artifacts
+      ansible.builtin.set_stats:
+        data:
+          db_vm_public_ip: "{{ db_vm_public_ip }}"
+          db_vm_private_ip: "{{ db_vm_private_ip }}"
+          db_vm_user: "{{ db_vm_user }}"
+        per_host: false
