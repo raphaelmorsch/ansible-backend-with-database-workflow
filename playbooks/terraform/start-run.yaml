@@ -84,15 +84,15 @@
               value: "{{ key_name }}"
         status_code: [200]
 
-      - name: Create Terraform configuration archive
-        ansible.builtin.command:
-          argv:
-            - tar
-            - -czf
-            - "{{ tf_config_archive }}"
-            - -C
-            - "/runner/project"
-            - "playbooks/hcl"
+    - name: Create Terraform configuration archive
+      ansible.builtin.command:
+        argv:
+          - tar
+          - -czf
+          - "{{ tf_config_archive }}"
+          - -C
+          - "/runner/project"
+          - "playbooks/hcl"
 
     - name: Create configuration version in TFE
       ansible.builtin.uri:
