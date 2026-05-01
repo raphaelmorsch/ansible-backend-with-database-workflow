@@ -1,29 +1,83 @@
-- name: Trigger Terraform Enterprise run
+---
+- name: Trigger Terraform Enterprise from AAP
   hosts: localhost
+  gather_facts: false
+
   vars:
-    tfe_token: "{{ lookup('env','TFE_TOKEN') }}"
-    tfe_url: "https://<SEU_TFE>"
-    workspace_id: "<WORKSPACE_ID>"
+    vm_name: "demo-db-{{ lookup('pipe','date +%s') }}"
+
   tasks:
 
-    - name: Start Terraform run
+    - name: Get Workspace ID
       uri:
-        url: "{{ tfe_url }}/api/v2/runs"
+        url: "{{ tf_hostname }}/api/v2/organizations/{{ tf_org }}/workspaces/{{ tf_workspace }}"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ tf_token }}"
+          Content-Type: "application/vnd.api+json"
+      register: workspace_info
+
+    - name: Set workspace_id
+      set_fact:
+        workspace_id: "{{ workspace_info.json.data.id }}"
+
+    # 🔹 Atualiza variável vm_name (Terraform variable)
+    - name: Update vm_name variable in TFE
+      uri:
+        url: "{{ tf_hostname }}/api/v2/workspaces/{{ workspace_id }}/vars"
         method: POST
         headers:
-          Authorization: "Bearer {{ tfe_token }}"
+          Authorization: "Bearer {{ tf_token }}"
+          Content-Type: "application/vnd.api+json"
+        body_format: json
+        body:
+          data:
+            type: vars
+            attributes:
+              key: "vm_name"
+              value: "{{ vm_name }}"
+              category: "terraform"
+              hcl: false
+              sensitive: false
+      ignore_errors: true  # evita erro se já existir
+
+    # 🔥 Dispara o run
+    - name: Start Terraform run
+      uri:
+        url: "{{ tf_hostname }}/api/v2/runs"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ tf_token }}"
           Content-Type: "application/vnd.api+json"
         body_format: json
         body:
           data:
             type: runs
+            attributes:
+              message: "AAP triggered run for {{ vm_name }}"
             relationships:
               workspace:
                 data:
                   type: workspaces
                   id: "{{ workspace_id }}"
-      register: tfe_run
+      register: run_response
 
-    - name: Save run id
+    - name: Set run_id
       set_fact:
-        run_id: "{{ tfe_run.json.data.id }}"
+        run_id: "{{ run_response.json.data.id }}"
+
+    # ⏳ Espera terminar
+    - name: Wait for Terraform apply
+      uri:
+        url: "{{ tf_hostname }}/api/v2/runs/{{ run_id }}"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ tf_token }}"
+      register: run_status
+      until: run_status.json.data.attributes.status == "applied"
+      retries: 30
+      delay: 10
+
+    - name: Show result
+      debug:
+        msg: "Terraform run {{ run_id }} completed successfully"
