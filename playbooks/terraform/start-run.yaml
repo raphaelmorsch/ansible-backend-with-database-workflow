@@ -155,6 +155,23 @@
       ansible.builtin.set_fact:
         run_id: "{{ run_response.json.data.id }}"
 
+    - name: Wait for Terraform run to finish
+      ansible.builtin.uri:
+        url: "{{ tf_hostname }}/api/v2/runs/{{ run_id }}"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ tf_token }}"
+          Content-Type: "application/vnd.api+json"
+      register: tf_run
+      until: tf_run.json.data.attributes.status in ["applied", "planned_and_finished", "errored", "canceled"]
+      retries: 90
+      delay: 10
+
+    - name: Fail if Terraform run did not apply
+      ansible.builtin.fail:
+        msg: "Terraform run finished with status {{ tf_run.json.data.attributes.status }}"
+      when: tf_run.json.data.attributes.status not in ["applied", "planned_and_finished"]  
+
     - name: Save VM name and run id as artifacts
       ansible.builtin.set_stats:
         data:
