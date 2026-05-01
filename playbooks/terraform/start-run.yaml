@@ -1,0 +1,29 @@
+- name: Trigger Terraform Enterprise run
+  hosts: localhost
+  vars:
+    tfe_token: "{{ lookup('env','TFE_TOKEN') }}"
+    tfe_url: "https://<SEU_TFE>"
+    workspace_id: "<WORKSPACE_ID>"
+  tasks:
+
+    - name: Start Terraform run
+      uri:
+        url: "{{ tfe_url }}/api/v2/runs"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ tfe_token }}"
+          Content-Type: "application/vnd.api+json"
+        body_format: json
+        body:
+          data:
+            type: runs
+            relationships:
+              workspace:
+                data:
+                  type: workspaces
+                  id: "{{ workspace_id }}"
+      register: tfe_run
+
+    - name: Save run id
+      set_fact:
+        run_id: "{{ tfe_run.json.data.id }}"
