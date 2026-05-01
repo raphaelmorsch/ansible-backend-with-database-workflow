@@ -3,8 +3,45 @@
   hosts: localhost
   gather_facts: false
 
-  vars:
-    vm_name: "demo-db-{{ lookup('pipe','date +%s') }}"
+- name: Get workspace variables
+  uri:
+    url: "{{ tf_hostname }}/api/v2/workspaces/{{ workspace_id }}/vars"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ tf_token }}"
+      Content-Type: "application/vnd.api+json"
+  register: workspace_vars
+
+- name: Get vm_name variable id
+  set_fact:
+    vm_name_var_id: >-
+      {{
+        (workspace_vars.json.data
+        | selectattr('attributes.key', 'equalto', 'vm_name')
+        | selectattr('attributes.category', 'equalto', 'terraform')
+        | list
+        | first).id
+      }}
+
+- name: Update vm_name variable in TFE
+  uri:
+    url: "{{ tf_hostname }}/api/v2/workspaces/{{ workspace_id }}/vars/{{ vm_name_var_id }}"
+    method: PATCH
+    headers:
+      Authorization: "Bearer {{ tf_token }}"
+      Content-Type: "application/vnd.api+json"
+    body_format: json
+    body:
+      data:
+        id: "{{ vm_name_var_id }}"
+        type: vars
+        attributes:
+          key: "vm_name"
+          value: "{{ vm_name }}"
+          category: "terraform"
+          hcl: false
+          sensitive: false
+    status_code: [200]
 
   tasks:
 
