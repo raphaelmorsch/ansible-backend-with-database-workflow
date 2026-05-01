@@ -55,6 +55,8 @@
             type: runs
             attributes:
               message: "AAP triggered run for {{ vm_name }}"
+              replace-addrs:
+                - "aws_instance.db"
             relationships:
               workspace:
                 data:
