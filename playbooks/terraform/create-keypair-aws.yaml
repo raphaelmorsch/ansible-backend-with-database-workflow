@@ -1,12 +1,20 @@
 ---
-- name: Import key pair into AWS
+- name: Import SSH public key into AWS
   hosts: localhost
   gather_facts: false
 
-  tasks:
+  vars:
+    aws_region: "us-east-2"
 
+  tasks:
     - name: Create key pair in AWS
       amazon.aws.ec2_key:
         name: "{{ key_name }}"
         key_material: "{{ ssh_public_key }}"
+        region: "{{ aws_region }}"
         state: present
+        force: true
+
+    - name: Confirm key pair
+      ansible.builtin.debug:
+        msg: "AWS key pair {{ key_name }} imported successfully in {{ aws_region }}"
