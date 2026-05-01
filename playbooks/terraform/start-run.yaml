@@ -5,6 +5,8 @@
 
   vars:
     vm_name: "demo-db-{{ lookup('pipe','date +%s') }}"
+    tf_config_dir: "/runner/project/playbooks/hcl"
+    tf_config_archive: "/tmp/tfconfig.tar.gz"
 
   tasks:
     - name: Get Workspace info
@@ -16,10 +18,9 @@
           Content-Type: "application/vnd.api+json"
       register: workspace_info
 
-    - name: Set workspace_id and configuration_version_id
+    - name: Set workspace_id
       ansible.builtin.set_fact:
         workspace_id: "{{ workspace_info.json.data.id }}"
-        configuration_version_id: "{{ workspace_info.json.data.relationships['current-configuration-version'].data.id }}"
 
     - name: Get workspace variables
       ansible.builtin.uri:
@@ -81,6 +82,46 @@
             type: vars
             attributes:
               value: "{{ key_name }}"
+        status_code: [200]
+
+    - name: Create Terraform configuration archive
+      ansible.builtin.command:
+        argv:
+          - tar
+          - -czf
+          - "{{ tf_config_archive }}"
+          - -C
+          - "{{ tf_config_dir }}"
+          - "."
+
+    - name: Create configuration version in TFE
+      ansible.builtin.uri:
+        url: "{{ tf_hostname }}/api/v2/workspaces/{{ workspace_id }}/configuration-versions"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ tf_token }}"
+          Content-Type: "application/vnd.api+json"
+        body_format: json
+        body:
+          data:
+            type: configuration-versions
+            attributes:
+              auto-queue-runs: false
+        status_code: [201]
+      register: config_version
+
+    - name: Set configuration version facts
+      ansible.builtin.set_fact:
+        configuration_version_id: "{{ config_version.json.data.id }}"
+        upload_url: "{{ config_version.json.data.attributes['upload-url'] }}"
+
+    - name: Upload Terraform configuration archive
+      ansible.builtin.uri:
+        url: "{{ upload_url }}"
+        method: PUT
+        src: "{{ tf_config_archive }}"
+        headers:
+          Content-Type: "application/octet-stream"
         status_code: [200]
 
     - name: Start Terraform run
