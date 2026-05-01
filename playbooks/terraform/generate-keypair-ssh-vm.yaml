@@ -5,14 +5,39 @@
 
   vars:
     key_name: "aap-demo-{{ lookup('pipe','date +%s') }}"
-    key_path: "/runner/{{ key_name }}"
+    key_dir: "/tmp/aap-keys"
+    key_path: "{{ key_dir }}/{{ key_name }}"
 
   tasks:
+    - name: Ensure key directory exists
+      ansible.builtin.file:
+        path: "{{ key_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: Check ssh-keygen exists
+      ansible.builtin.command: which ssh-keygen
+      register: ssh_keygen_check
+      changed_when: false
+
     - name: Generate SSH key pair
       ansible.builtin.command:
-        cmd: "ssh-keygen -t rsa -b 2048 -f {{ key_path }} -N ''"
-      args:
-        creates: "{{ key_path }}"
+        argv:
+          - ssh-keygen
+          - -t
+          - rsa
+          - -b
+          - "2048"
+          - -f
+          - "{{ key_path }}"
+          - -N
+          - ""
+      register: keygen_result
+      changed_when: keygen_result.rc == 0
+
+    - name: Show ssh-keygen result
+      ansible.builtin.debug:
+        var: keygen_result
 
     - name: Check generated private key
       ansible.builtin.stat:
@@ -21,7 +46,7 @@
 
     - name: Fail if private key was not generated
       ansible.builtin.fail:
-        msg: "Private key was not generated at {{ key_path }}"
+        msg: "Private key was not generated at {{ key_path }}. ssh-keygen result: {{ keygen_result }}"
       when: not private_key_stat.stat.exists
 
     - name: Read private key
