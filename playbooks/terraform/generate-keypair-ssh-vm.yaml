@@ -15,15 +15,10 @@
         state: directory
         mode: "0700"
 
-    - name: Check ssh-keygen exists
-      ansible.builtin.command: which ssh-keygen
-      register: ssh_keygen_check
-      changed_when: false
-
     - name: Generate SSH key pair
       ansible.builtin.command:
         argv:
-          - ssh-keygen
+          - /usr/bin/ssh-keygen
           - -t
           - rsa
           - -b
@@ -35,10 +30,6 @@
       register: keygen_result
       changed_when: keygen_result.rc == 0
 
-    - name: Show ssh-keygen result
-      ansible.builtin.debug:
-        var: keygen_result
-
     - name: Check generated private key
       ansible.builtin.stat:
         path: "{{ key_path }}"
@@ -46,7 +37,7 @@
 
     - name: Fail if private key was not generated
       ansible.builtin.fail:
-        msg: "Private key was not generated at {{ key_path }}. ssh-keygen result: {{ keygen_result }}"
+        msg: "Private key was not generated. Result: {{ keygen_result }}"
       when: not private_key_stat.stat.exists
 
     - name: Read private key
@@ -66,7 +57,3 @@
           ssh_private_key: "{{ private_key.content | b64decode }}"
           ssh_public_key: "{{ public_key.content | b64decode }}"
         per_host: false
-
-    - name: Show key name
-      ansible.builtin.debug:
-        msg: "Generated key pair {{ key_name }}"
