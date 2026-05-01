@@ -82,6 +82,23 @@
               value: "{{ key_name }}"
         status_code: [200]
 
+    - name: Get latest configuration version
+      ansible.builtin.uri:
+        url: "{{ tf_hostname }}/api/v2/workspaces/{{ workspace_id }}/configuration-versions?page%5Bsize%5D=1"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ tf_token }}"
+          Content-Type: "application/vnd.api+json"
+      register: config_versions
+
+    - name: Set latest configuration version id
+      ansible.builtin.set_fact:
+        configuration_version_id: "{{ config_versions.json.data[0].id }}"
+
+    - name: Show configuration version used
+      ansible.builtin.debug:
+        msg: "Using configuration version {{ configuration_version_id }}"
+
     - name: Start Terraform run
       ansible.builtin.uri:
         url: "{{ tf_hostname }}/api/v2/runs"
@@ -102,9 +119,13 @@
                 data:
                   type: workspaces
                   id: "{{ workspace_id }}"
+              configuration-version:
+                data:
+                  type: configuration-versions
+                  id: "{{ configuration_version_id }}"
         status_code: [201]
       register: run_response
-
+      
     - name: Set run_id
       ansible.builtin.set_fact:
         run_id: "{{ run_response.json.data.id }}"
