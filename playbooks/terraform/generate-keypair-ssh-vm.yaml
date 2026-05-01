@@ -5,29 +5,43 @@
 
   vars:
     key_name: "aap-demo-{{ lookup('pipe','date +%s') }}"
+    key_path: "/runner/{{ key_name }}"
 
   tasks:
-
-    - name: Generate private key (native)
+    - name: Generate SSH key pair
       ansible.builtin.command:
-        cmd: ssh-keygen -t rsa -b 2048 -f /tmp/{{ key_name }} -N ""
+        cmd: "ssh-keygen -t rsa -b 2048 -f {{ key_path }} -N ''"
       args:
-        creates: "/tmp/{{ key_name }}"
+        creates: "{{ key_path }}"
+
+    - name: Check generated private key
+      ansible.builtin.stat:
+        path: "{{ key_path }}"
+      register: private_key_stat
+
+    - name: Fail if private key was not generated
+      ansible.builtin.fail:
+        msg: "Private key was not generated at {{ key_path }}"
+      when: not private_key_stat.stat.exists
 
     - name: Read private key
       ansible.builtin.slurp:
-        src: "/tmp/{{ key_name }}"
+        src: "{{ key_path }}"
       register: private_key
 
     - name: Read public key
       ansible.builtin.slurp:
-        src: "/tmp/{{ key_name }}.pub"
+        src: "{{ key_path }}.pub"
       register: public_key
 
-    - name: Save artifacts
+    - name: Save SSH key pair as workflow artifacts
       ansible.builtin.set_stats:
         data:
+          key_name: "{{ key_name }}"
           ssh_private_key: "{{ private_key.content | b64decode }}"
           ssh_public_key: "{{ public_key.content | b64decode }}"
-          key_name: "{{ key_name }}"
         per_host: false
+
+    - name: Show key name
+      ansible.builtin.debug:
+        msg: "Generated key pair {{ key_name }}"
