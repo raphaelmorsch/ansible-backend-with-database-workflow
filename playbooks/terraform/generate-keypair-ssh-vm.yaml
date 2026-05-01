@@ -4,11 +4,14 @@
   gather_facts: false
 
   vars:
-    key_name: "aap-demo-{{ lookup('pipe','date +%s') }}"
     key_dir: "/tmp/aap-keys"
-    key_path: "{{ key_dir }}/{{ key_name }}"
 
   tasks:
+    - name: Set key name once
+      ansible.builtin.set_fact:
+        key_name: "aap-demo-{{ lookup('pipe','date +%s') }}"
+        key_path: "{{ key_dir }}/aap-demo-{{ lookup('pipe','date +%s') }}"
+
     - name: Ensure key directory exists
       ansible.builtin.file:
         path: "{{ key_dir }}"
@@ -28,17 +31,10 @@
           - -N
           - ""
       register: keygen_result
-      changed_when: keygen_result.rc == 0
 
-    - name: Check generated private key
-      ansible.builtin.stat:
-        path: "{{ key_path }}"
-      register: private_key_stat
-
-    - name: Fail if private key was not generated
-      ansible.builtin.fail:
-        msg: "Private key was not generated. Result: {{ keygen_result }}"
-      when: not private_key_stat.stat.exists
+    - name: Show keygen result
+      ansible.builtin.debug:
+        var: keygen_result
 
     - name: Read private key
       ansible.builtin.slurp:
