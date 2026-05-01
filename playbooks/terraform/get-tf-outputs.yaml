@@ -1,0 +1,49 @@
+---
+- name: Get Terraform outputs from TFE
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Get Workspace ID
+      ansible.builtin.uri:
+        url: "{{ tf_hostname }}/api/v2/organizations/{{ tf_org }}/workspaces/{{ tf_workspace }}"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ tf_token }}"
+          Content-Type: "application/vnd.api+json"
+      register: workspace_info
+
+    - name: Set workspace_id
+      ansible.builtin.set_fact:
+        workspace_id: "{{ workspace_info.json.data.id }}"
+
+    - name: Get current state version
+      ansible.builtin.uri:
+        url: "{{ tf_hostname }}/api/v2/workspaces/{{ workspace_id }}/current-state-version"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ tf_token }}"
+          Content-Type: "application/vnd.api+json"
+      register: state_version
+
+    - name: Get outputs
+      ansible.builtin.uri:
+        url: "{{ tf_hostname }}{{ state_version.json.data.relationships.outputs.links.related }}"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ tf_token }}"
+          Content-Type: "application/vnd.api+json"
+      register: tf_outputs
+
+    - name: Set DB VM facts
+      ansible.builtin.set_fact:
+        db_vm_public_ip: "{{ (tf_outputs.json.data | selectattr('attributes.name','equalto','db_vm_public_ip') | first).attributes.value }}"
+        db_vm_private_ip: "{{ (tf_outputs.json.data | selectattr('attributes.name','equalto','db_vm_private_ip') | first).attributes.value }}"
+        db_vm_user: "{{ (tf_outputs.json.data | selectattr('attributes.name','equalto','db_vm_user') | first).attributes.value }}"
+
+    - name: Show DB VM info
+      ansible.builtin.debug:
+        msg:
+          - "Public IP: {{ db_vm_public_ip }}"
+          - "Private IP: {{ db_vm_private_ip }}"
+          - "User: {{ db_vm_user }}"
