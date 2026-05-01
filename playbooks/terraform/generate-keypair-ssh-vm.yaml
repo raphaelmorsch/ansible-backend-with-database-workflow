@@ -8,17 +8,26 @@
 
   tasks:
 
-    - name: Generate private key
-      community.crypto.openssh_keypair:
-        path: "/tmp/{{ key_name }}"
-        type: rsa
-        size: 2048
-      register: ssh_key
+    - name: Generate private key (native)
+      ansible.builtin.command:
+        cmd: ssh-keygen -t rsa -b 2048 -f /tmp/{{ key_name }} -N ""
+      args:
+        creates: "/tmp/{{ key_name }}"
+
+    - name: Read private key
+      ansible.builtin.slurp:
+        src: "/tmp/{{ key_name }}"
+      register: private_key
+
+    - name: Read public key
+      ansible.builtin.slurp:
+        src: "/tmp/{{ key_name }}.pub"
+      register: public_key
 
     - name: Save artifacts
       ansible.builtin.set_stats:
         data:
-          ssh_private_key: "{{ ssh_key.private_key }}"
-          ssh_public_key: "{{ ssh_key.public_key }}"
+          ssh_private_key: "{{ private_key.content | b64decode }}"
+          ssh_public_key: "{{ public_key.content | b64decode }}"
           key_name: "{{ key_name }}"
         per_host: false
