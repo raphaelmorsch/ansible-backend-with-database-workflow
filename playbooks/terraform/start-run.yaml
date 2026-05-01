@@ -78,6 +78,19 @@
         status_code: [200]
       when: vm_name_var_id is defined
 
+    - name: Get current configuration version
+      ansible.builtin.uri:
+        url: "{{ tf_hostname }}/api/v2/workspaces/{{ workspace_id }}/current-configuration-version"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ tf_token }}"
+          Content-Type: "application/vnd.api+json"
+      register: current_cv
+
+    - name: Set configuration version id
+      ansible.builtin.set_fact:
+        configuration_version_id: "{{ current_cv.json.data.id }}"  
+
     - name: Start Terraform run
       ansible.builtin.uri:
         url: "{{ tf_hostname }}/api/v2/runs"
