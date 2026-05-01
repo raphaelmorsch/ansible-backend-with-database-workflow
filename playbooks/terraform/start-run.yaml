@@ -7,7 +7,7 @@
     vm_name: "demo-db-{{ lookup('pipe','date +%s') }}"
 
   tasks:
-    - name: Get Workspace ID
+    - name: Get Workspace info
       ansible.builtin.uri:
         url: "{{ tf_hostname }}/api/v2/organizations/{{ tf_org }}/workspaces/{{ tf_workspace }}"
         method: GET
@@ -16,9 +16,10 @@
           Content-Type: "application/vnd.api+json"
       register: workspace_info
 
-    - name: Set workspace_id
+    - name: Set workspace_id and configuration_version_id
       ansible.builtin.set_fact:
         workspace_id: "{{ workspace_info.json.data.id }}"
+        configuration_version_id: "{{ workspace_info.json.data.relationships['current-configuration-version'].data.id }}"
 
     - name: Get workspace variables
       ansible.builtin.uri:
@@ -82,23 +83,6 @@
               value: "{{ key_name }}"
         status_code: [200]
 
-    - name: Get latest configuration version
-      ansible.builtin.uri:
-        url: "{{ tf_hostname }}/api/v2/workspaces/{{ workspace_id }}/configuration-versions?page%5Bsize%5D=1"
-        method: GET
-        headers:
-          Authorization: "Bearer {{ tf_token }}"
-          Content-Type: "application/vnd.api+json"
-      register: config_versions
-
-    - name: Set latest configuration version id
-      ansible.builtin.set_fact:
-        configuration_version_id: "{{ config_versions.json.data[0].id }}"
-
-    - name: Show configuration version used
-      ansible.builtin.debug:
-        msg: "Using configuration version {{ configuration_version_id }}"
-
     - name: Start Terraform run
       ansible.builtin.uri:
         url: "{{ tf_hostname }}/api/v2/runs"
@@ -125,16 +109,17 @@
                   id: "{{ configuration_version_id }}"
         status_code: [201]
       register: run_response
-      
+
     - name: Set run_id
       ansible.builtin.set_fact:
         run_id: "{{ run_response.json.data.id }}"
 
-    - name: Save VM name as artifact
+    - name: Save VM name and run id as artifacts
       ansible.builtin.set_stats:
         data:
           vm_name: "{{ vm_name }}"
           run_id: "{{ run_id }}"
+          configuration_version_id: "{{ configuration_version_id }}"
         per_host: false
 
     - name: Show Terraform run info
@@ -143,3 +128,4 @@
           - "Run ID: {{ run_id }}"
           - "VM Name: {{ vm_name }}"
           - "AWS Key Name: {{ key_name }}"
+          - "Configuration Version: {{ configuration_version_id }}"
