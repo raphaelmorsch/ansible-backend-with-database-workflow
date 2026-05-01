@@ -46,8 +46,6 @@
       ansible.builtin.dnf:
         name:
           - postgresql-server
-          - postgresql
-          - python3-psycopg2
         state: present
 
     - name: Initialize database
