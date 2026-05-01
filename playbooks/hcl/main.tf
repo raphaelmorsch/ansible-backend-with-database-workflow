@@ -26,9 +26,14 @@ variable "vm_name" {
   type = string
 }
 
+variable "aws_key_name" {
+  type = string
+}
+
 resource "aws_instance" "db" {
   ami           = data.aws_ami.rhel9.id
   instance_type = "t3.micro"
+  key_name      = var.aws_key_name
 
   tags = {
     Name = var.vm_name

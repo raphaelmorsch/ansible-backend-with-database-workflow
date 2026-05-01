@@ -1,0 +1,24 @@
+---
+- name: Generate SSH key pair
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    key_name: "aap-demo-{{ lookup('pipe','date +%s') }}"
+
+  tasks:
+
+    - name: Generate private key
+      community.crypto.openssh_keypair:
+        path: "/tmp/{{ key_name }}"
+        type: rsa
+        size: 2048
+      register: ssh_key
+
+    - name: Save artifacts
+      ansible.builtin.set_stats:
+        data:
+          ssh_private_key: "{{ ssh_key.private_key }}"
+          ssh_public_key: "{{ ssh_key.public_key }}"
+          key_name: "{{ key_name }}"
+        per_host: false

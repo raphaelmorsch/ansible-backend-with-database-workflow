@@ -22,7 +22,21 @@
       ansible.builtin.set_fact:
         workspace_id: "{{ workspace_info.json.data.id }}"
 
-    # 🔹 2. Buscar variável vm_name
+    - name: Update aws_key_name variable
+      uri:
+        url: "{{ tf_hostname }}/api/v2/workspaces/{{ workspace_id }}/vars/{{ aws_key_var_id }}"
+        method: PATCH
+        headers:
+          Authorization: "Bearer {{ tf_token }}"
+          Content-Type: "application/vnd.api+json"
+        body_format: json
+        body:
+          data:
+            id: "{{ aws_key_var_id }}"
+            type: vars
+            attributes:
+              value: "{{ key_name }}"
+                  # 🔹 2. Buscar variável vm_name
     - name: Get workspace variables
       ansible.builtin.uri:
         url: "{{ tf_hostname }}/api/v2/workspaces/{{ workspace_id }}/vars"
