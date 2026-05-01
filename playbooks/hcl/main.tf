@@ -22,12 +22,16 @@ data "aws_ami" "rhel9" {
   }
 }
 
+variable "vm_name" {
+  type = string
+}
+
 resource "aws_instance" "db" {
   ami           = data.aws_ami.rhel9.id
   instance_type = "t3.micro"
 
   tags = {
-    Name = "demo-db"
+    Name = var.vm_name
   }
 }
 
