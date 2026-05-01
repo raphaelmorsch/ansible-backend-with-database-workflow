@@ -43,17 +43,49 @@
       changed_when: false
       failed_when: false
 
-    - name: Collect memory before install
+    - name: Show memory before swap
       ansible.builtin.command: free -m
-      register: memory_before
+      register: memory_before_swap
       changed_when: false
       failed_when: false
 
-    - name: Show memory before install
+    - name: Debug memory before swap
       ansible.builtin.debug:
-        var: memory_before.stdout_lines
+        var: memory_before_swap.stdout_lines
 
-    - name: Debug dnf install manually
+    - name: Create swap file
+      ansible.builtin.command: fallocate -l 1G /swapfile
+      args:
+        creates: /swapfile
+
+    - name: Set swap permissions
+      ansible.builtin.file:
+        path: /swapfile
+        mode: "0600"
+
+    - name: Format swap
+      ansible.builtin.command: mkswap /swapfile
+      register: mkswap_result
+      failed_when: false
+      changed_when: mkswap_result.rc == 0
+
+    - name: Enable swap
+      ansible.builtin.command: swapon /swapfile
+      register: swapon_result
+      failed_when: false
+      changed_when: swapon_result.rc == 0
+
+    - name: Show memory after swap
+      ansible.builtin.command: free -m
+      register: memory_after_swap
+      changed_when: false
+      failed_when: false
+
+    - name: Debug memory after swap
+      ansible.builtin.debug:
+        var: memory_after_swap.stdout_lines
+
+    - name: Install PostgreSQL packages
       ansible.builtin.command:
         cmd: dnf -v -y install postgresql-server
       register: dnf_debug
