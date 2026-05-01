@@ -76,7 +76,7 @@ resource "aws_security_group" "db_sg" {
 
 resource "aws_instance" "db" {
   ami           = data.aws_ami.rhel9.id
-  instance_type = "t3.micro"
+  instance_type = "t3.medium"
   key_name      = var.aws_key_name
   vpc_security_group_ids = [aws_security_group.db_sg.id]
 
