@@ -1,0 +1,26 @@
+version: 3
+
+images:
+  base_image:
+    name: registry.redhat.io/ansible-automation-platform-26/ee-supported-rhel9:latest
+
+dependencies:
+  galaxy:
+    collections:
+      - name: community.postgresql
+
+  python:
+    - psycopg2-binary
+
+  system:
+    - gcc
+    - python3-devel
+    - python3-pip
+    - postgresql
+    - systemd-devel
+    - pkgconf-pkg-config
+    - libxml2-devel
+    - python3-psycopg2
+
+options:
+  package_manager_path: /usr/bin/microdnf
