@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import os
 import ssl
 from contextlib import asynccontextmanager
@@ -10,10 +12,12 @@ import asyncpg
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, status
-from fastapi.responses import FileResponse
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 POOL: asyncpg.Pool | None = None
+
+log = logging.getLogger(__name__)
 
 
 def _ssl_for_asyncpg():
@@ -61,10 +65,66 @@ async def _ensure_schema(conn: asyncpg.Connection) -> None:
     )
 
 
+def _connect_timeout_sec() -> float:
+    return float(os.environ.get("PGCONNECT_TIMEOUT", "45"))
+
+
+def _pool_retry_settings() -> tuple[int, float]:
+    retries = int(os.environ.get("PG_POOL_CONNECT_RETRIES", "30"))
+    delay = float(os.environ.get("PG_POOL_CONNECT_DELAY_SEC", "4"))
+    return max(1, retries), max(0.5, delay)
+
+
+async def _create_pool_with_retries() -> asyncpg.Pool:
+    """New VM Postgres often accepts TCP a bit after the Deployment rolls; retry instead of one-shot fail."""
+    connect_kw = _pool_connect_kwargs()
+    connect_kw["timeout"] = _connect_timeout_sec()
+    host = connect_kw.get("host") or os.environ.get("PGHOST", "?")
+    retries, delay = _pool_retry_settings()
+    last_exc: Exception | None = None
+    for attempt in range(1, retries + 1):
+        try:
+            pool = await asyncpg.create_pool(min_size=1, max_size=5, **connect_kw)
+            if attempt > 1:
+                log.warning(
+                    "PostgreSQL pool ready on attempt %s/%s (host=%s)",
+                    attempt,
+                    retries,
+                    host,
+                )
+            return pool
+        except Exception as e:
+            last_exc = e
+            log.warning(
+                "PostgreSQL pool attempt %s/%s failed (host=%s): %s: %s",
+                attempt,
+                retries,
+                host,
+                type(e).__name__,
+                e,
+            )
+            if attempt >= retries:
+                break
+            await asyncio.sleep(delay)
+    log.error(
+        "PostgreSQL pool startup exhausted (%s attempts, host=%s)",
+        retries,
+        host,
+        exc_info=last_exc,
+    )
+    assert last_exc is not None
+    raise RuntimeError(
+        "Cannot open PostgreSQL pool after retries. Often: Postgres/service on the VM "
+        "still starting, security group rule propagation, or cluster egress not allowed yet. "
+        f"host={host!r} retries={retries} delay_sec={delay}. "
+        "psql from your laptop does not prove the pod path is ready at the same time."
+    ) from last_exc
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global POOL
-    POOL = await asyncpg.create_pool(min_size=1, max_size=5, **_pool_connect_kwargs())
+    POOL = await _create_pool_with_retries()
     async with POOL.acquire() as conn:
         await _ensure_schema(conn)
     yield
@@ -75,11 +135,30 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Orders PoC", lifespan=lifespan)
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
+_INDEX_FILE = _STATIC_DIR / "index.html"
+
+
+def _load_index_html() -> str:
+    if not _INDEX_FILE.is_file():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Web UI file missing in container (expected orders_api/static/index.html). "
+                "Rebuild with: cd application && oc start-build orders-api --from-dir=. --follow"
+            ),
+        )
+    return _INDEX_FILE.read_text(encoding="utf-8")
 
 
 @app.get("/", include_in_schema=False)
-async def orders_web_ui():
-    return FileResponse(_STATIC_DIR / "index.html", media_type="text/html; charset=utf-8")
+async def orders_web_ui_root():
+    return HTMLResponse(_load_index_html(), media_type="text/html; charset=utf-8")
+
+
+@app.get("/ui", include_in_schema=False)
+async def orders_web_ui_alias():
+    """Alternate path if something in front of the app interferes with ``/``."""
+    return HTMLResponse(_load_index_html(), media_type="text/html; charset=utf-8")
 
 
 class OrderCreate(BaseModel):
@@ -100,6 +179,12 @@ class OrderOut(BaseModel):
     item_description: str
     quantity: int
     created_at: datetime
+
+
+@app.get("/live", include_in_schema=False)
+async def live():
+    """Process is up (used for liveness); does not touch PostgreSQL."""
+    return {"status": "alive"}
 
 
 @app.get("/health")

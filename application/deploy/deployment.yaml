@@ -37,15 +37,24 @@ spec:
             limits:
               cpu: 500m
               memory: 256Mi
+          startupProbe:
+            httpGet:
+              path: /live
+              port: http
+            periodSeconds: 5
+            # Allow long PG wait (retries * (connect timeout + delay)); see ConfigMap PG_POOL_*.
+            failureThreshold: 130
           readinessProbe:
             httpGet:
               path: /health
               port: http
-            initialDelaySeconds: 5
+            initialDelaySeconds: 2
             periodSeconds: 10
+            timeoutSeconds: 5
           livenessProbe:
             httpGet:
-              path: /health
+              path: /live
               port: http
-            initialDelaySeconds: 15
-            periodSeconds: 20
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 3

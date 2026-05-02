@@ -10,3 +10,8 @@ data:
  PGUSER: "appuser"
   # asyncpg: use require when Postgres has TLS; default disable for plain Postgres.
   PGSSLMODE: "disable"
+  # Per-attempt TCP connect timeout (seconds). Keep moderate when using many retries.
+  PGCONNECT_TIMEOUT: "15"
+  # Pool creation: retry if Postgres on a new VM is still starting or network is briefly unavailable.
+  PG_POOL_CONNECT_RETRIES: "30"
+  PG_POOL_CONNECT_DELAY_SEC: "4"
