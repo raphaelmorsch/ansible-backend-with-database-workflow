@@ -14,3 +14,10 @@
 
     - debug:
         var: curl_ocp
+
+    - command: curl -k -v --connect-timeout 10 https://console-openshift-console.apps.cluster-v8jc8.dynamic.redhatworkshops.io
+      register: console_test
+      ignore_errors: true
+
+    - debug:
+        var: console_test
