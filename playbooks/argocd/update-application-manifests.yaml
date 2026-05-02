@@ -23,13 +23,13 @@
         dest: "{{ repo_dir }}"
         version: "{{ git_branch }}"
 
-    # 🔥 NOVO: renderiza kustomization.yaml corretamente
+    # 🔥 Atualiza o kustomization.yaml via template (fonte da verdade)
     - name: Render kustomization.yaml with DB data
       ansible.builtin.template:
         src: kustomization.yaml.j2
         dest: "{{ kustomization_path }}"
 
-    # 🔐 Atualiza Secret (simples, ok para demo)
+    # 🔐 Atualiza senha no Secret
     - name: Update database password Secret
       ansible.builtin.lineinfile:
         path: "{{ secret_path }}"
@@ -43,14 +43,6 @@
       loop:
         - "{{ kustomization_path }}"
         - "{{ secret_path }}"
-      changed_when: false
-
-    # (opcional mas MUITO bom pra demo)
-    - name: Validate kustomize build
-      ansible.builtin.command:
-        cmd: kustomize build application/deploy
-      args:
-        chdir: "{{ repo_dir }}"
       changed_when: false
 
     - name: Configure git user
