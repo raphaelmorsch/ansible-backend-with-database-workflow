@@ -5,6 +5,7 @@ namespace: orders-poc
 
 resources:
   - namespace.yaml
+  - secret-orders-db.yaml
   - configmap.yaml
   - rbac-argocd-workload.yaml
   - deployment.yaml

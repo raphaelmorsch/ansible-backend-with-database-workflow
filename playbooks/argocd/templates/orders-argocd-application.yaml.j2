@@ -4,6 +4,12 @@ metadata:
   name: {{ argocd_application_name }}
   namespace: {{ argocd_control_plane_namespace }}
 spec:
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      name: orders-db
+      jsonPointers:
+        - /data
   project: {{ argocd_project_name }}
   source:
     repoURL: {{ orders_app_git_repo_url }}

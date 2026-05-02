@@ -5,8 +5,8 @@
 # if that is where your Argo CD server runs.
 # Update repoURL and targetRevision to match this repository.
 #
-# Before sync: create the database secret in orders-poc (not managed by this file):
-#   oc create secret generic orders-db --from-literal=password='...' -n orders-poc
+# Git includes a placeholder Secret; patch the real DB password after first sync:
+#   oc patch secret orders-db -n orders-poc -p '{"stringData":{"password":"..."}}' --type=merge
 #
 # Ensure your external PostgreSQL allows connections from the OpenShift cluster
 # egress (security groups / firewall / pg_hba.conf).
@@ -16,6 +16,12 @@ metadata:
   name: orders-api-poc
   namespace: openshift-gitops
 spec:
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      name: orders-db
+      jsonPointers:
+        - /data
   project: default
   source:
     repoURL: https://github.com/raphaelmorsch/ansible-backend-with-database-workflow.git
