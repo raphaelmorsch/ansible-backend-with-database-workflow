@@ -21,3 +21,9 @@
 
     - debug:
         var: console_test
+
+    - command: bash -lc "nc -vz -w 5 api.cluster-v8jc8.dynamic.redhatworkshops.io 6443"
+      register: nc_test
+      ignore_errors: true
+    
+    - debug: var=nc_test
