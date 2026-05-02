@@ -1,0 +1,95 @@
+---
+- name: Update application manifests with DB connection data
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    repo_url: "github.com/raphaelmorsch/ansible-backend-with-database-workflow.git"
+    repo_dir: "/tmp/ansible-backend-with-database-workflow"
+    git_branch: "main"
+
+    configmap_path: "{{ repo_dir }}/application/deploy/configmap.yaml"
+    secret_path: "{{ repo_dir }}/application/deploy/secret-orders-db.yaml"
+
+  tasks:
+    - name: Remove previous repo clone
+      ansible.builtin.file:
+        path: "{{ repo_dir }}"
+        state: absent
+
+    - name: Clone repository
+      ansible.builtin.git:
+        repo: "https://{{ git_username }}:{{ git_token }}@{{ repo_url }}"
+        dest: "{{ repo_dir }}"
+        version: "{{ git_branch }}"
+
+    - name: Update PGHOST
+      ansible.builtin.lineinfile:
+        path: "{{ configmap_path }}"
+        regexp: '^\s*PGHOST:'
+        line: ' PGHOST: "{{ db_host }}"'
+
+    - name: Update PGPORT
+      ansible.builtin.lineinfile:
+        path: "{{ configmap_path }}"
+        regexp: '^\s*PGPORT:'
+        line: ' PGPORT: "{{ db_port }}"'
+
+    - name: Update PGDATABASE
+      ansible.builtin.lineinfile:
+        path: "{{ configmap_path }}"
+        regexp: '^\s*PGDATABASE:'
+        line: ' PGDATABASE: "{{ db_name }}"'
+
+    - name: Update PGUSER
+      ansible.builtin.lineinfile:
+        path: "{{ configmap_path }}"
+        regexp: '^\s*PGUSER:'
+        line: ' PGUSER: "{{ db_user }}"'
+
+    - name: Update database password Secret
+      ansible.builtin.lineinfile:
+        path: "{{ secret_path }}"
+        regexp: '^\s*password:'
+        line: ' password: "{{ db_password }}"'
+
+    - name: Configure git user
+      ansible.builtin.shell: |
+        git config user.name "AAP Automation"
+        git config user.email "aap-automation@example.com"
+      args:
+        chdir: "{{ repo_dir }}"
+
+    - name: Check git diff
+      ansible.builtin.command: git diff -- application/deploy/configmap.yaml application/deploy/secret-orders-db.yaml
+      args:
+        chdir: "{{ repo_dir }}"
+      register: git_diff
+      changed_when: false
+
+    - name: Show diff
+      ansible.builtin.debug:
+        var: git_diff.stdout_lines
+
+    - name: Commit changes
+      ansible.builtin.shell: |
+        git add application/deploy/configmap.yaml application/deploy/secret-orders-db.yaml
+        git commit -m "Update DB connection data from AAP workflow"
+      args:
+        chdir: "{{ repo_dir }}"
+      register: git_commit
+      failed_when: git_commit.rc not in [0, 1]
+      changed_when: git_commit.rc == 0
+
+    - name: Push changes
+      ansible.builtin.command: git push origin "{{ git_branch }}"
+      args:
+        chdir: "{{ repo_dir }}"
+      when: git_commit.rc == 0
+
+    - name: Save application GitOps update status
+      ansible.builtin.set_stats:
+        data:
+          app_gitops_updated: "{{ git_commit.rc == 0 }}"
+          app_namespace: "orders-poc"
+        per_host: false
