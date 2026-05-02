@@ -2,6 +2,8 @@ apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
   name: orders-api
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   to:
     kind: Service

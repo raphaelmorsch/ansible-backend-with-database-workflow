@@ -6,6 +6,7 @@ namespace: orders-poc
 resources:
   - namespace.yaml
   - configmap.yaml
+  - rbac-argocd-routes.yaml
   - deployment.yaml
   - service.yaml
   - route.yaml
