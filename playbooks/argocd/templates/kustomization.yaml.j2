@@ -1,0 +1,34 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: orders-poc
+
+resources:
+  - namespace.yaml
+  - secret-orders-db.yaml
+  - rbac-argocd-workload.yaml
+  - deployment.yaml
+  - service.yaml
+  - route.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: orders-api
+      app.kubernetes.io/component: api
+
+configMapGenerator:
+  - name: orders-api-config
+    literals:
+      - PGHOST={{ db_host }}
+      - PGPORT={{ db_port }}
+      - PGDATABASE={{ db_name }}
+      - PGUSER={{ db_user }}
+      - PGSSLMODE=disable
+      - PGCONNECT_TIMEOUT=15
+      - PG_POOL_CONNECT_RETRIES=30
+      - PG_POOL_CONNECT_DELAY_SEC=4
+
+images:
+  - name: orders-api
+    newName: image-registry.openshift-image-registry.svc:5000/orders-poc/orders-api
+    newTag: latest
