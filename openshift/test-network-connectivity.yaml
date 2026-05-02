@@ -7,3 +7,10 @@
 
     - debug:
         var: curl_google
+
+    - command: curl -k -v --connect-timeout 10 https://api.cluster-v8jc8.dynamic.redhatworkshops.io:6443/version
+      register: curl_ocp
+      ignore_errors: true
+
+    - debug:
+        var: curl_ocp
