@@ -1,0 +1,40 @@
+---
+# Create (or update) the Argo CD Application via the OpenShift/Kubernetes API.
+#
+# If AAP cannot reach the cluster API, use instead:
+#   playbooks/argocd/create-orders-application-argocd-api.yaml
+# (Argo CD REST API + Bearer token only.)
+#
+# Ansible Automation Platform:
+# - Execution environment must include collection: kubernetes.core
+# - Credential type: OpenShift / Kubernetes API Bearer Token (or kubeconfig) with
+#   permission to create Applications in {{ argocd_control_plane_namespace }}
+#   (argoproj.io/applications, get/list/watch/patch/create/update).
+#
+# Survey / extra vars commonly set: orders_app_git_repo_url, orders_app_git_revision,
+# orders_app_destination_namespace, argocd_control_plane_namespace.
+#
+- name: Register Orders API Argo CD Application
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  collections:
+    - kubernetes.core
+
+  vars:
+    argocd_control_plane_namespace: openshift-gitops
+    argocd_application_name: orders-api-poc
+    argocd_project_name: default
+    argocd_destination_server: https://kubernetes.default.svc
+    argocd_sync_prune: true
+    argocd_sync_self_heal: true
+    orders_app_git_repo_url: https://github.com/raphaelmorsch/ansible-backend-with-database-workflow.git
+    orders_app_git_revision: main
+    orders_app_git_path: application/deploy
+    orders_app_destination_namespace: orders-poc
+
+  tasks:
+    - name: Apply Argo CD Application manifest
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('template', playbook_dir + '/templates/orders-argocd-application.yaml.j2') | from_yaml }}"

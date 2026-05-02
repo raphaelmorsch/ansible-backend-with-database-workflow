@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: orders-api-config
+data:
+  # Point to PostgreSQL outside the cluster (VM, RDS, on-prem, etc.).
+  PGHOST: "REPLACE_WITH_EXTERNAL_PG_HOST"
+  PGPORT: "5432"
+  PGDATABASE: "orders"
+  PGUSER: "orders_app"

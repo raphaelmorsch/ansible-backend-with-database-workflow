@@ -1,0 +1,79 @@
+---
+# Register the Orders PoC Application in Argo CD using the Argo CD HTTP API only
+# (no OpenShift/Kubernetes API login from AAP required).
+#
+# AAP job template:
+# - Inventory: localhost (or any single host; tasks run on controller).
+# - Extra vars / survey: set argocd_api_url and argocd_api_token (see below).
+# - Execution environment: stock ansible-core is enough (no kubernetes.core).
+#
+# Token: create an Argo CD account token or use an existing API token, and store it
+# in an AAP credential (e.g. generic) bound to extra var argocd_api_token.
+#
+# Base URL example (OpenShift GitOps): trim trailing slash
+#   https://openshift-gitops-server-openshift-gitops.apps.<cluster>.example.com
+#
+- name: Register Orders API Argo CD Application (Argo CD API)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    argocd_api_url: ""
+    argocd_api_token: ""
+    argocd_validate_certs: true
+    argocd_trigger_sync_after: false
+    argocd_control_plane_namespace: openshift-gitops
+    argocd_application_name: orders-api-poc
+    argocd_project_name: default
+    argocd_destination_server: https://kubernetes.default.svc
+    argocd_sync_prune: true
+    argocd_sync_self_heal: true
+    orders_app_git_repo_url: https://github.com/raphaelmorsch/ansible-backend-with-database-workflow.git
+    orders_app_git_revision: main
+    orders_app_git_path: application/deploy
+    orders_app_destination_namespace: orders-poc
+
+  tasks:
+    - name: Validate Argo CD API settings
+      ansible.builtin.assert:
+        that:
+          - argocd_api_url | default('', true) | length > 0
+          - argocd_api_token | default('', true) | length > 0
+        fail_msg: >-
+          Set argocd_api_url (e.g. https://openshift-gitops-server-openshift-gitops.apps...) and
+          argocd_api_token (Bearer token) as extra vars or on the job template.
+
+    - name: Render Application manifest (same template as Kubernetes apply playbook)
+      ansible.builtin.set_fact:
+        _orders_argocd_app: "{{ lookup('template', playbook_dir + '/templates/orders-argocd-application.yaml.j2') | from_yaml }}"
+
+    - name: Upsert Application via Argo CD API
+      ansible.builtin.uri:
+        url: "{{ argocd_api_url | regex_replace('/$', '') }}/api/v1/applications?upsert=true"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ argocd_api_token }}"
+          Content-Type: "application/json"
+        body:
+          metadata: "{{ _orders_argocd_app.metadata }}"
+          spec: "{{ _orders_argocd_app.spec }}"
+        body_format: json
+        validate_certs: "{{ argocd_validate_certs | bool }}"
+        status_code: [200, 201]
+
+    - name: Request immediate sync (optional)
+      when: argocd_trigger_sync_after | bool
+      ansible.builtin.uri:
+        url: >-
+          {{ argocd_api_url | regex_replace('/$', '') }}/api/v1/applications/{{
+          (argocd_control_plane_namespace ~ '/' ~ argocd_application_name) | replace('/', '%2F')
+          }}/sync
+        method: POST
+        headers:
+          Authorization: "Bearer {{ argocd_api_token }}"
+          Content-Type: "application/json"
+        body: {}
+        body_format: json
+        validate_certs: "{{ argocd_validate_certs | bool }}"
+        status_code: [200]

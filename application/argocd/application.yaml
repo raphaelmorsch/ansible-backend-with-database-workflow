@@ -1,0 +1,32 @@
+# Apply from the repo root (adjust namespace if you use upstream Argo CD in `argocd`):
+#   oc apply -f application/argocd/application.yaml -n openshift-gitops
+#
+# The Application metadata.namespace below is openshift-gitops; change it to `argocd`
+# if that is where your Argo CD server runs.
+# Update repoURL and targetRevision to match this repository.
+#
+# Before sync: create the database secret in orders-poc (not managed by this file):
+#   oc create secret generic orders-db --from-literal=password='...' -n orders-poc
+#
+# Ensure your external PostgreSQL allows connections from the OpenShift cluster
+# egress (security groups / firewall / pg_hba.conf).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: orders-api-poc
+  namespace: openshift-gitops
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/raphaelmorsch/ansible-backend-with-database-workflow.git
+    targetRevision: main
+    path: application/deploy
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: orders-poc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

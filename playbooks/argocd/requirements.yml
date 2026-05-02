@@ -1,0 +1,6 @@
+---
+# kubernetes.core — playbook create-orders-application.yaml (cluster API).
+# create-orders-application-argocd-api.yaml uses only ansible.builtin (no entry needed here).
+collections:
+  - name: kubernetes.core
+    version: ">=2.4.0"

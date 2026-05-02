@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: orders-poc
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - deployment.yaml
+  - service.yaml
+  - route.yaml
+
+commonLabels:
+  app.kubernetes.io/name: orders-api
+  app.kubernetes.io/component: api
+
+# Internal registry image (no tag in newName; newTag supplies the tag).
+images:
+  - name: orders-api
+    newName: image-registry.openshift-image-registry.svc:5000/orders-poc/orders-api #This should be passed on an Ansible Survey later on
+    newTag: latest #This should be passed on an Ansible Survey later on
