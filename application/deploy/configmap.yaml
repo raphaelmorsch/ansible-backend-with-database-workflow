@@ -3,14 +3,14 @@ kind: ConfigMap
 metadata:
   name: orders-api-config
 data:
- PGHOST: "3.134.95.130"
- PGPORT: "5432"
- PGDATABASE: "appdb"
- PGUSER: "appuser"
+  PGHOST: "3.134.95.130"
+  PGPORT: "5432"
+  PGDATABASE: "appdb"
+  PGUSER: "appuser"
   # asyncpg: use require when Postgres has TLS; default disable for plain Postgres.
- PGSSLMODE: "disable"
+  PGSSLMODE: "disable"
   # Per-attempt TCP connect timeout (seconds). Keep moderate when using many retries.
- PGCONNECT_TIMEOUT: "15"
+  PGCONNECT_TIMEOUT: "15"
   # Pool creation: retry if Postgres on a new VM is still starting or network is briefly unavailable.
- PG_POOL_CONNECT_RETRIES: "30"
- PG_POOL_CONNECT_DELAY_SEC: "4"
+  PG_POOL_CONNECT_RETRIES: "30"
+  PG_POOL_CONNECT_DELAY_SEC: "4"
