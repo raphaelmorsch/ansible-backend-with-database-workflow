@@ -7,7 +7,10 @@ import ssl
 from contextlib import asynccontextmanager
 from datetime import datetime
 import asyncpg
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 POOL: asyncpg.Pool | None = None
@@ -70,6 +73,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Orders PoC", lifespan=lifespan)
+
+_STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+
+@app.get("/", include_in_schema=False)
+async def orders_web_ui():
+    return FileResponse(_STATIC_DIR / "index.html", media_type="text/html; charset=utf-8")
 
 
 class OrderCreate(BaseModel):
