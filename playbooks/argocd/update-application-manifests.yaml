@@ -19,7 +19,7 @@
 
     - name: Clone repository
       ansible.builtin.git:
-        repo: "https://{{ git_username }}:{{ git_token }}@{{ repo_url }}"
+        repo: "git@github.com:raphaelmorsch"
         dest: "{{ repo_dir }}"
         version: "{{ git_branch }}"
 
