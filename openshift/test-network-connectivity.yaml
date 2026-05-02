@@ -1,12 +1,4 @@
-- name: Test network
-  hosts: localhost
+- hosts: localhost
   gather_facts: false
-
   tasks:
-    - name: Curl API
-      command: curl -k https://api.cluster-v8jc8.dynamic.redhatworkshops.io:6443
-      register: result
-      ignore_errors: yes
-
-    - debug:
-        var: result
+    - command: curl -I https://www.google.com
