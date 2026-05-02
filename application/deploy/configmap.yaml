@@ -3,10 +3,10 @@ kind: ConfigMap
 metadata:
   name: orders-api-config
 data:
- PGHOST: "18.219.65.138"
- PGPORT: "5432"
- PGDATABASE: "appdb"
- PGUSER: "appuser"
+  PGHOST: "18.117.217.177"
+  PGPORT: "5432"
+  PGDATABASE: "appdb"
+  PGUSER: "appuser"
   # asyncpg: use require when Postgres has TLS; default disable for plain Postgres.
   PGSSLMODE: "disable"
   # Per-attempt TCP connect timeout (seconds). Keep moderate when using many retries.
