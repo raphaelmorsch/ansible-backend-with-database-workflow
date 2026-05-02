@@ -19,7 +19,7 @@ labels:
 configMapGenerator:
   - name: orders-api-config
     literals:
-      - PGHOST=3.134.95.130
+      - PGHOST=18.223.123.3
       - PGPORT=5432
       - PGDATABASE=appdb
       - PGUSER=appuser
@@ -28,8 +28,7 @@ configMapGenerator:
       - PG_POOL_CONNECT_RETRIES=30
       - PG_POOL_CONNECT_DELAY_SEC=4
 
-# Internal registry image (no tag in newName; newTag supplies the tag).
 images:
   - name: orders-api
-    newName: image-registry.openshift-image-registry.svc:5000/orders-poc/orders-api #This should be passed on an Ansible Survey later on
-    newTag: latest #This should be passed on an Ansible Survey later on
+    newName: image-registry.openshift-image-registry.svc:5000/orders-poc/orders-api
+    newTag: latest
