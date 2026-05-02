@@ -6,15 +6,27 @@ namespace: orders-poc
 resources:
   - namespace.yaml
   - secret-orders-db.yaml
-  - configmap.yaml
   - rbac-argocd-workload.yaml
   - deployment.yaml
   - service.yaml
   - route.yaml
 
-commonLabels:
-  app.kubernetes.io/name: orders-api
-  app.kubernetes.io/component: api
+labels:
+  - pairs:
+      app.kubernetes.io/name: orders-api
+      app.kubernetes.io/component: api
+
+configMapGenerator:
+  - name: orders-api-config
+    literals:
+      - PGHOST=3.134.95.130
+      - PGPORT=5432
+      - PGDATABASE=appdb
+      - PGUSER=appuser
+      - PGSSLMODE=disable
+      - PGCONNECT_TIMEOUT=15
+      - PG_POOL_CONNECT_RETRIES=30
+      - PG_POOL_CONNECT_DELAY_SEC=4
 
 # Internal registry image (no tag in newName; newTag supplies the tag).
 images:

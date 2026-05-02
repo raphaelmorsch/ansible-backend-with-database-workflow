@@ -1,5 +1,5 @@
 ---
-- name: Update application manifests with DB connection data
+- name: JT06 - Update GitOps repo with DB connection (Kustomize)
   hosts: localhost
   gather_facts: false
 
@@ -8,7 +8,7 @@
     repo_dir: "/tmp/ansible-backend-with-database-workflow"
     git_branch: "main"
 
-    configmap_path: "{{ repo_dir }}/application/deploy/configmap.yaml"
+    kustomization_path: "{{ repo_dir }}/application/deploy/kustomization.yaml"
     secret_path: "{{ repo_dir }}/application/deploy/secret-orders-db.yaml"
 
   tasks:
@@ -19,39 +19,39 @@
 
     - name: Clone repository
       ansible.builtin.git:
-        repo: "https://{{ git_username }}:{{ git_token }}@github.com/raphaelmorsch/ansible-backend-with-database-workflow.git"
+        repo: "https://{{ git_username }}:{{ git_token }}@{{ repo_url }}"
         dest: "{{ repo_dir }}"
         version: "{{ git_branch }}"
 
-    - name: Update PGHOST
-      ansible.builtin.lineinfile:
-        path: "{{ configmap_path }}"
-        regexp: '^\s*PGHOST:'
-        line: '  PGHOST: "{{ db_host }}"'
+    # 🔥 NOVO: renderiza kustomization.yaml corretamente
+    - name: Render kustomization.yaml with DB data
+      ansible.builtin.template:
+        src: kustomization.yaml.j2
+        dest: "{{ kustomization_path }}"
 
-    - name: Update PGPORT
-      ansible.builtin.lineinfile:
-        path: "{{ configmap_path }}"
-        regexp: '^\s*PGPORT:'
-        line: '  PGPORT: "{{ db_port }}"'
-
-    - name: Update PGDATABASE
-      ansible.builtin.lineinfile:
-        path: "{{ configmap_path }}"
-        regexp: '^\s*PGDATABASE:'
-        line: '  PGDATABASE: "{{ db_name }}"'
-
-    - name: Update PGUSER
-      ansible.builtin.lineinfile:
-        path: "{{ configmap_path }}"
-        regexp: '^\s*PGUSER:'
-        line: '  PGUSER: "{{ db_user }}"'
-
+    # 🔐 Atualiza Secret (simples, ok para demo)
     - name: Update database password Secret
       ansible.builtin.lineinfile:
         path: "{{ secret_path }}"
         regexp: '^\s*password:'
-        line: ' password: "{{ db_password }}"'
+        line: '  password: "{{ db_password }}"'
+
+    # ✅ Validação YAML (evita quebrar ArgoCD)
+    - name: Validate YAML syntax
+      ansible.builtin.command:
+        cmd: python3 -c "import yaml; yaml.safe_load(open('{{ item }}'))"
+      loop:
+        - "{{ kustomization_path }}"
+        - "{{ secret_path }}"
+      changed_when: false
+
+    # (opcional mas MUITO bom pra demo)
+    - name: Validate kustomize build
+      ansible.builtin.command:
+        cmd: kustomize build application/deploy
+      args:
+        chdir: "{{ repo_dir }}"
+      changed_when: false
 
     - name: Configure git user
       ansible.builtin.shell: |
@@ -61,20 +61,20 @@
         chdir: "{{ repo_dir }}"
 
     - name: Check git diff
-      ansible.builtin.command: git diff -- application/deploy/configmap.yaml application/deploy/secret-orders-db.yaml
+      ansible.builtin.command: git diff
       args:
         chdir: "{{ repo_dir }}"
       register: git_diff
       changed_when: false
 
-    - name: Show diff
+    - name: Show diff (demo friendly)
       ansible.builtin.debug:
         var: git_diff.stdout_lines
 
     - name: Commit changes
       ansible.builtin.shell: |
-        git add application/deploy/configmap.yaml application/deploy/secret-orders-db.yaml
-        git commit -m "Update DB connection data from AAP workflow"
+        git add .
+        git commit -m "JT06 - Update DB connection via AAP"
       args:
         chdir: "{{ repo_dir }}"
       register: git_commit
@@ -87,7 +87,7 @@
         chdir: "{{ repo_dir }}"
       when: git_commit.rc == 0
 
-    - name: Save application GitOps update status
+    - name: Save workflow status
       ansible.builtin.set_stats:
         data:
           app_gitops_updated: "{{ git_commit.rc == 0 }}"
