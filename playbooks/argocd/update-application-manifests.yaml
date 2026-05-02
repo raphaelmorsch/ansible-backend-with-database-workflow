@@ -27,25 +27,25 @@
       ansible.builtin.lineinfile:
         path: "{{ configmap_path }}"
         regexp: '^\s*PGHOST:'
-        line: ' PGHOST: "{{ db_host }}"'
+        line: '  PGHOST: "{{ db_host }}"'
 
     - name: Update PGPORT
       ansible.builtin.lineinfile:
         path: "{{ configmap_path }}"
         regexp: '^\s*PGPORT:'
-        line: ' PGPORT: "{{ db_port }}"'
+        line: '  PGPORT: "{{ db_port }}"'
 
     - name: Update PGDATABASE
       ansible.builtin.lineinfile:
         path: "{{ configmap_path }}"
         regexp: '^\s*PGDATABASE:'
-        line: ' PGDATABASE: "{{ db_name }}"'
+        line: '  PGDATABASE: "{{ db_name }}"'
 
     - name: Update PGUSER
       ansible.builtin.lineinfile:
         path: "{{ configmap_path }}"
         regexp: '^\s*PGUSER:'
-        line: ' PGUSER: "{{ db_user }}"'
+        line: '  PGUSER: "{{ db_user }}"'
 
     - name: Update database password Secret
       ansible.builtin.lineinfile:
