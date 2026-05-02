@@ -2,3 +2,8 @@
   gather_facts: false
   tasks:
     - command: curl -I https://www.google.com
+      register: curl_google
+      ignore_errors: true
+
+    - debug:
+        var: curl_google
