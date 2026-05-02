@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import ssl
 from contextlib import asynccontextmanager
 from datetime import datetime
 import asyncpg
@@ -12,16 +13,34 @@ from pydantic import BaseModel, Field
 POOL: asyncpg.Pool | None = None
 
 
+def _ssl_for_asyncpg():
+    """asyncpg may try SSL by default; plain Postgres (no TLS) then fails in _create_ssl_connection."""
+    mode = (os.environ.get("PGSSLMODE") or "disable").strip().lower()
+    if mode in ("disable", "off", "false", "no", "allow"):
+        return False
+    if mode == "prefer":
+        return False
+    if mode in ("require", "verify-ca", "verify-full"):
+        ctx = ssl.create_default_context()
+        if mode == "require":
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+        return ctx
+    return False
+
+
 def _pool_connect_kwargs() -> dict:
+    ssl_arg = _ssl_for_asyncpg()
     url = os.environ.get("DATABASE_URL")
     if url:
-        return {"dsn": url}
+        return {"dsn": url, "ssl": ssl_arg}
     return {
         "host": os.environ.get("PGHOST", "localhost"),
         "port": int(os.environ.get("PGPORT", "5432")),
         "user": os.environ.get("PGUSER", "postgres"),
         "password": os.environ.get("PGPASSWORD", ""),
         "database": os.environ.get("PGDATABASE", "postgres"),
+        "ssl": ssl_arg,
     }
 
 

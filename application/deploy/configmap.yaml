@@ -4,7 +4,9 @@ metadata:
   name: orders-api-config
 data:
   # PostgreSQL outside the cluster (adjust if your host changes).
- PGHOST: "13.58.55.194"
- PGPORT: "5432"
- PGDATABASE: "appdb"
- PGUSER: "appuser"
+  PGHOST: "13.58.55.194"
+  PGPORT: "5432"
+  PGDATABASE: "appdb"
+  PGUSER: "appuser"
+  # asyncpg: use require when Postgres has TLS; default disable for plain Postgres.
+  PGSSLMODE: "disable"
