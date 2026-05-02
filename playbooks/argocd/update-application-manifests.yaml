@@ -19,10 +19,9 @@
 
     - name: Clone repository
       ansible.builtin.git:
-        repo: "git@github.com:raphaelmorsch/ansible-backend-with-database-workflow.git"
+        repo: "https://{{ git_username }}:{{ git_token }}@github.com/raphaelmorsch/ansible-backend-with-database-workflow.git"
         dest: "{{ repo_dir }}"
         version: "{{ git_branch }}"
-        accept_hostkey: true
 
     - name: Update PGHOST
       ansible.builtin.lineinfile:
