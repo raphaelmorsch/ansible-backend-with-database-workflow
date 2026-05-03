@@ -1,0 +1,19 @@
+---
+- name: JT00 - Create ITSM Ticket
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Create ticket
+      ansible.builtin.uri:
+        url: "http://ticket-itsm.apps.cluster-v8jc8.dynamic.redhatworkshops.io/tickets"
+        method: POST
+        body_format: json
+        body:
+          request: "Provision DB and update OpenShift application"
+      register: ticket
+
+    - name: Save ticket ID
+      ansible.builtin.set_stats:
+        data:
+          itsm_ticket_id: "{{ ticket.json.id }}"

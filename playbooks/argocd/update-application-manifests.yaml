@@ -85,3 +85,12 @@
           app_gitops_updated: "{{ git_commit.rc == 0 }}"
           app_namespace: "orders-poc"
         per_host: false
+
+    - name: Update ticket - GitOps step
+      ansible.builtin.uri:
+        url: "http://ticket-itsm.apps.cluster-v8jc8.dynamic.redhatworkshops.io/tickets/{{ itsm_ticket_id }}"
+        method: PATCH
+        body_format: json
+        body:
+          status: "IN_PROGRESS"
+          comment: "GitOps updated. ArgoCD syncing application."
