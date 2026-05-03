@@ -7,6 +7,18 @@
     key_path: "/tmp/runtime_key"
 
   tasks:
+
+    - name: Update ticket - starting step
+      ansible.builtin.uri:
+        url: "http://ticket-itsm.apps.cluster-v8jc8.dynamic.redhatworkshops.io/tickets/{{ itsm_ticket_id }}"
+        method: PATCH
+        body_format: json
+        status_code: [200, 201]
+        body:
+          status: "IN_PROGRESS"
+          comment: "Starting step: Configuring Database on VM."
+
+
     - name: Write private key to file
       ansible.builtin.copy:
         content: "{{ ssh_private_key }}"
@@ -194,3 +206,13 @@
           - "DB Port: 5432"
           - "DB Name: {{ db_name }}"
           - "DB User: {{ db_user }}"
+
+    - name: Update ticket - step completed
+      ansible.builtin.uri:
+        url: "http://ticket-itsm.apps.cluster-v8jc8.dynamic.redhatworkshops.io/tickets/{{ itsm_ticket_id }}"
+        method: PATCH
+        body_format: json
+        status_code: [200, 201]
+        body:
+          status: "IN_PROGRESS"
+          comment: "Completed step: Configuring Database on VM."

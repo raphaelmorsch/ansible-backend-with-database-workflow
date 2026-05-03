@@ -9,6 +9,17 @@
     tf_config_archive: "/tmp/tfconfig.tar.gz"
 
   tasks:
+
+    - name: Update ticket - starting step
+      ansible.builtin.uri:
+        url: "http://ticket-itsm.apps.cluster-v8jc8.dynamic.redhatworkshops.io/tickets/{{ itsm_ticket_id }}"
+        method: PATCH
+        body_format: json
+        status_code: [200, 201]
+        body:
+          status: "IN_PROGRESS"
+          comment: "Starting step: Creating Virtual Machine."
+
     - name: Get Workspace info
       ansible.builtin.uri:
         url: "{{ tf_hostname }}/api/v2/organizations/{{ tf_org }}/workspaces/{{ tf_workspace }}"
@@ -187,3 +198,13 @@
           - "VM Name: {{ vm_name }}"
           - "AWS Key Name: {{ key_name }}"
           - "Configuration Version: {{ configuration_version_id }}"
+
+    - name: Update ticket - step completed
+      ansible.builtin.uri:
+        url: "http://ticket-itsm.apps.cluster-v8jc8.dynamic.redhatworkshops.io/tickets/{{ itsm_ticket_id }}"
+        method: PATCH
+        body_format: json
+        status_code: [200, 201]
+        body:
+          status: "IN_PROGRESS"
+          comment: "Completed step: Creating Virtual Machine."
