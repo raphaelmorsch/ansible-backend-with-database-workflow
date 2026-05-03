@@ -19,7 +19,7 @@ labels:
 configMapGenerator:
   - name: orders-api-config
     literals:
-      - PGHOST=3.16.162.200
+      - PGHOST=18.188.63.212
       - PGPORT=5432
       - PGDATABASE=appdb
       - PGUSER=appuser
