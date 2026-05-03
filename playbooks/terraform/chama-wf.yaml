@@ -1,0 +1,10 @@
+- name: Launch workflow via module
+  hosts: localhost
+  tasks:
+    - name: Launch workflow
+      ansible.controller.workflow_launch:
+        workflow_template: "WF01 - Criar Backend com DB em VM"
+        controller_host: https://control-lrlq5-1.apps.ocpv06.rhdp.net/
+        controller_username: admin
+        controller_password: ansible123!
+        validate_certs: false
