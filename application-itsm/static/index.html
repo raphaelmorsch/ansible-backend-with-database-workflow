@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mock ITSM · Service Desk</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --panel: #ffffff;
+      --canvas: #f1f5f9;
+      --accent: #1d4ed8;
+      --accent-hover: #1e40af;
+      --sidebar: #0f172a;
+      --sidebar-text: #e2e8f0;
+      --radius: 10px;
+      --shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 4px 20px rgba(15, 23, 42, 0.06);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "IBM Plex Sans", system-ui, sans-serif;
+      background: var(--canvas);
+      color: var(--ink);
+      font-size: 15px;
+    }
+    .layout { display: flex; min-height: 100vh; }
+    aside {
+      width: 240px;
+      flex-shrink: 0;
+      background: var(--sidebar);
+      color: var(--sidebar-text);
+      padding: 1.5rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    aside .brand { font-weight: 600; font-size: 1.05rem; letter-spacing: -0.02em; }
+    aside .sub { font-size: 0.75rem; opacity: 0.7; line-height: 1.4; }
+    aside a { color: #93c5fd; text-decoration: none; font-size: 0.85rem; }
+    aside a:hover { text-decoration: underline; }
+    main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    .topbar {
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .topbar h1 { margin: 0; font-size: 1.15rem; font-weight: 600; }
+    .topbar .meta { font-size: 0.8rem; color: var(--muted); }
+    button.btn {
+      font: inherit;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: 8px;
+      border: none;
+      padding: 0.5rem 1rem;
+      background: var(--accent);
+      color: #fff;
+    }
+    button.btn:hover { background: var(--accent-hover); }
+    button.btn.secondary { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+    button.btn.secondary:hover { background: #f8fafc; }
+    button.btn.danger { background: #b91c1c; }
+    button.btn.danger:hover { background: #991b1b; }
+    .content { flex: 1; display: grid; grid-template-columns: 1fr; gap: 0; }
+    @media (min-width: 960px) {
+      .content { grid-template-columns: minmax(0, 1.1fr) minmax(340px, 0.9fr); }
+    }
+    .pane { padding: 1.25rem 1.5rem; overflow: auto; }
+    .card {
+      background: var(--panel);
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th {
+      text-align: left;
+      padding: 0.65rem 1rem;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      font-weight: 600;
+      background: #f8fafc;
+      border-bottom: 1px solid var(--line);
+    }
+    td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr.ticket-row { cursor: pointer; transition: background 0.12s; }
+    tr.ticket-row:hover { background: #f8fafc; }
+    tr.ticket-row.active { background: #eff6ff; outline: 1px solid #bfdbfe; outline-offset: -1px; }
+    .mono { font-family: ui-monospace, monospace; font-size: 0.85rem; }
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .b-new { background: #dbeafe; color: #1e40af; }
+    .b-open { background: #d1fae5; color: #065f46; }
+    .b-progress { background: #fef3c7; color: #92400e; }
+    .b-pending { background: #e9d5ff; color: #6b21a8; }
+    .b-closed { background: #f1f5f9; color: #475569; }
+    .p1 { background: #fee2e2; color: #991b1b; }
+    .p2 { background: #ffedd5; color: #9a3412; }
+    .p3 { background: #dbeafe; color: #1d4ed8; }
+    .p4 { background: #f1f5f9; color: #64748b; }
+    .detail-head { padding: 1rem 1.25rem; border-bottom: 1px solid var(--line); }
+    .detail-head h2 { margin: 0 0 0.35rem; font-size: 1.05rem; }
+    .detail-head .idline { font-size: 0.8rem; color: var(--muted); }
+    .detail-body { padding: 1.25rem; }
+    .detail-body h3 { margin: 1.25rem 0 0.5rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+    .detail-body h3:first-child { margin-top: 0; }
+    .desc { white-space: pre-wrap; line-height: 1.5; color: #334155; font-size: 0.9rem; }
+    .timeline { list-style: none; margin: 0; padding: 0; }
+    .timeline li {
+      position: relative;
+      padding-left: 1rem;
+      margin-bottom: 0.85rem;
+      border-left: 2px solid var(--line);
+      margin-left: 0.35rem;
+    }
+    .timeline li::before {
+      content: "";
+      position: absolute;
+      left: -5px;
+      top: 0.35rem;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+    .timeline .when { font-size: 0.72rem; color: var(--muted); }
+    .timeline .what { margin-top: 0.2rem; font-size: 0.88rem; }
+    .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+    select, textarea, input[type="text"] {
+      font: inherit;
+      width: 100%;
+      padding: 0.5rem 0.65rem;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      margin-top: 0.35rem;
+    }
+    textarea { min-height: 72px; resize: vertical; }
+    label { font-size: 0.75rem; font-weight: 500; color: var(--muted); }
+    .empty { text-align: center; padding: 3rem 1.5rem; color: var(--muted); }
+    .toast {
+      position: fixed;
+      bottom: 1.25rem;
+      right: 1.25rem;
+      max-width: 360px;
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius);
+      font-size: 0.88rem;
+      box-shadow: var(--shadow);
+      display: none;
+      z-index: 50;
+    }
+    .toast.err { display: block; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+    .toast.ok { display: block; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      z-index: 40;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .modal-backdrop.show { display: flex; }
+    .modal {
+      background: var(--panel);
+      border-radius: var(--radius);
+      max-width: 520px;
+      width: 100%;
+      max-height: 90vh;
+      overflow: auto;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.2);
+    }
+    .modal h2 { margin: 0; padding: 1rem 1.25rem; border-bottom: 1px solid var(--line); font-size: 1.05rem; }
+    .modal .inner { padding: 1.25rem; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    @media (max-width: 520px) { .row2 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside>
+      <div>
+        <div class="brand">Mock ITSM</div>
+        <div class="sub">In-memory simulation for AAP workflow testing. Data resets when the process restarts.</div>
+      </div>
+      <div class="sub">
+        <a href="/docs">OpenAPI docs</a><br />
+        <a href="/openapi.json">openapi.json</a>
+      </div>
+    </aside>
+    <main>
+      <div class="topbar">
+        <div>
+          <h1>Tickets</h1>
+          <div class="meta" id="count-meta">Loading…</div>
+        </div>
+        <button type="button" class="btn" id="btn-new">New ticket</button>
+      </div>
+      <div class="content">
+        <div class="pane">
+          <div class="card" id="list-card">
+            <div id="list-body"></div>
+          </div>
+        </div>
+        <div class="pane">
+          <div class="card" id="detail-card">
+            <div class="empty" id="detail-placeholder">Select a ticket to view details, activity, and actions.</div>
+            <div id="detail-root" style="display:none"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+  <div class="modal-backdrop" id="modal-backdrop">
+    <div class="modal">
+      <h2>Create ticket</h2>
+      <form class="inner" id="form-create">
+        <label for="c-title">Short title <span style="font-weight:400;opacity:.7">(optional)</span></label>
+        <input type="text" id="c-title" maxlength="200" placeholder="e.g. Provision database for project X" />
+        <label for="c-desc">Description <span style="color:#b91c1c">*</span></label>
+        <textarea id="c-desc" required placeholder="Describe the request…"></textarea>
+        <div class="row2">
+          <div>
+            <label for="c-pri">Priority</label>
+            <select id="c-pri">
+              <option>P4</option><option>P3</option><option>P2</option><option>P1</option>
+            </select>
+          </div>
+        </div>
+        <div class="actions" style="border:none;padding-top:1.25rem;margin:0">
+          <button type="submit" class="btn">Submit</button>
+          <button type="button" class="btn secondary" id="btn-cancel-create">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script>
+    const listBody = document.getElementById("list-body");
+    const countMeta = document.getElementById("count-meta");
+    const detailPlaceholder = document.getElementById("detail-placeholder");
+    const detailRoot = document.getElementById("detail-root");
+    const toast = document.getElementById("toast");
+    const modalBackdrop = document.getElementById("modal-backdrop");
+    let selectedId = null;
+    let lastList = [];
+
+    function toastShow(kind, msg) {
+      toast.className = "toast " + kind;
+      toast.textContent = msg;
+      clearTimeout(toast._t);
+      toast._t = setTimeout(() => { toast.className = "toast"; toast.textContent = ""; }, 4500);
+    }
+
+    async function api(path, opts = {}) {
+      const r = await fetch(path, {
+        headers: { "Content-Type": "application/json", ...(opts.headers || {}) },
+        ...opts,
+      });
+      const text = await r.text();
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch (_) {}
+      if (!r.ok) {
+        const d = data && data.detail ? (Array.isArray(data.detail) ? JSON.stringify(data.detail) : data.detail) : text;
+        throw new Error(d || r.statusText);
+      }
+      return data;
+    }
+
+    function statusClass(s) {
+      const x = (s || "").toUpperCase();
+      if (x === "NEW") return "b-new";
+      if (x === "OPEN") return "b-open";
+      if (x === "IN_PROGRESS" || x === "WORK_IN_PROGRESS") return "b-progress";
+      if (x === "PENDING" || x === "WAITING") return "b-pending";
+      if (x === "CLOSED" || x === "RESOLVED") return "b-closed";
+      return "b-open";
+    }
+    function priClass(p) {
+      const x = (p || "P3").toUpperCase();
+      if (x === "P1") return "p1";
+      if (x === "P2") return "p2";
+      if (x === "P3") return "p3";
+      return "p4";
+    }
+
+    function renderList(tickets, count) {
+      countMeta.textContent = count + " ticket" + (count === 1 ? "" : "s");
+      if (!tickets.length) {
+        listBody.innerHTML = '<div class="empty">No tickets yet. Create one with <strong>New ticket</strong> or the API <code>POST /tickets</code>.</div>';
+        return;
+      }
+      const rows = tickets.map((t) => {
+        const active = t.id === selectedId ? " active" : "";
+        return `<tr class="ticket-row${active}" data-id="${escapeAttr(t.id)}">
+          <td class="mono">${escapeHtml(t.id)}</td>
+          <td>${escapeHtml(t.title)}</td>
+          <td><span class="badge ${priClass(t.priority)}">${escapeHtml(t.priority)}</span></td>
+          <td><span class="badge ${statusClass(t.status)}">${escapeHtml(t.status)}</span></td>
+          <td class="mono" style="font-size:0.8rem;color:var(--muted)">${fmt(t.updated_at)}</td>
+        </tr>`;
+      }).join("");
+      listBody.innerHTML = `<table><thead><tr><th>ID</th><th>Title</th><th>Pri</th><th>Status</th><th>Updated</th></tr></thead><tbody>${rows}</tbody></table>`;
+      listBody.querySelectorAll(".ticket-row").forEach((row) => {
+        row.addEventListener("click", () => openDetail(row.getAttribute("data-id")));
+      });
+    }
+
+    function escapeHtml(s) {
+      const d = document.createElement("div");
+      d.textContent = s == null ? "" : String(s);
+      return d.innerHTML;
+    }
+    function escapeAttr(s) {
+      return escapeHtml(s).replace(/"/g, "&quot;");
+    }
+    function fmt(iso) {
+      try { return new Date(iso).toLocaleString(); } catch (_) { return iso || "—"; }
+    }
+
+    async function loadList() {
+      const data = await api("/tickets");
+      lastList = data.tickets || [];
+      renderList(lastList, data.count || 0);
+    }
+
+    async function openDetail(id) {
+      selectedId = id;
+      renderList(lastList, lastList.length);
+      detailPlaceholder.style.display = "none";
+      detailRoot.style.display = "block";
+      detailRoot.innerHTML = '<div class="empty">Loading…</div>';
+      try {
+        const t = await api("/tickets/" + encodeURIComponent(id));
+        renderDetail(t);
+      } catch (e) {
+        detailRoot.innerHTML = '<div class="empty">' + escapeHtml(e.message) + "</div>";
+      }
+    }
+
+    function renderDetail(t) {
+      const hist = (t.history || []).slice().reverse();
+      const histHtml = hist.length
+        ? "<ul class=\"timeline\">" + hist.map((h) =>
+            `<li><div class="when">${escapeHtml(fmt(h.at))} · ${escapeHtml(h.type)}</div><div class="what">${escapeHtml(h.detail)}</div></li>`
+          ).join("") + "</ul>"
+        : "<p class=\"empty\" style=\"padding:1rem 0\">No activity yet.</p>";
+
+      const closed = (t.status || "").toUpperCase() === "CLOSED";
+      detailRoot.innerHTML = `
+        <div class="detail-head">
+          <h2>${escapeHtml(t.title)}</h2>
+          <div class="idline">Ticket <span class="mono">${escapeHtml(t.id)}</span>
+            · <span class="badge ${priClass(t.priority)}">${escapeHtml(t.priority)}</span>
+            · <span class="badge ${statusClass(t.status)}">${escapeHtml(t.status)}</span></div>
+        </div>
+        <div class="detail-body">
+          <h3>Description</h3>
+          <div class="desc">${escapeHtml(t.description)}</div>
+          <h3>Record</h3>
+          <div class="idline" style="font-size:0.85rem">Created ${escapeHtml(fmt(t.created_at))} · Updated ${escapeHtml(fmt(t.updated_at))}</div>
+          <h3>Activity</h3>
+          ${histHtml}
+          <h3>Update</h3>
+          <label for="u-status">Status</label>
+          <select id="u-status" ${closed ? "disabled" : ""}>
+            <option value="">— unchanged —</option>
+            <option>NEW</option><option>OPEN</option><option>IN_PROGRESS</option><option>PENDING</option><option>CLOSED</option>
+          </select>
+          <label for="u-comment" style="display:block;margin-top:0.75rem">Comment</label>
+          <textarea id="u-comment" placeholder="Add a work note…" ${closed ? "disabled" : ""}></textarea>
+          <div class="actions">
+            <button type="button" class="btn" id="btn-patch" ${closed ? "disabled" : ""}>Save update</button>
+            <button type="button" class="btn danger" id="btn-close" ${closed ? "disabled" : ""}>Close ticket</button>
+          </div>
+        </div>`;
+
+      if (!closed) {
+        document.getElementById("btn-patch").onclick = async () => {
+          const st = document.getElementById("u-status").value;
+          const comment = document.getElementById("u-comment").value.trim();
+          if (!st && !comment) { toastShow("err", "Choose a status and/or enter a comment."); return; }
+          try {
+            await api("/tickets/" + encodeURIComponent(t.id), {
+              method: "PATCH",
+              body: JSON.stringify({ status: st || null, comment: comment || null }),
+            });
+            document.getElementById("u-comment").value = "";
+            document.getElementById("u-status").selectedIndex = 0;
+            toastShow("ok", "Ticket updated.");
+            await loadList();
+            await openDetail(t.id);
+          } catch (e) { toastShow("err", e.message); }
+        };
+        document.getElementById("btn-close").onclick = async () => {
+          if (!confirm("Close ticket " + t.id + "?")) return;
+          try {
+            await api("/tickets/" + encodeURIComponent(t.id) + "/close", { method: "PATCH" });
+            toastShow("ok", "Ticket closed.");
+            await loadList();
+            await openDetail(t.id);
+          } catch (e) { toastShow("err", e.message); }
+        };
+      }
+    }
+
+    document.getElementById("btn-new").onclick = () => { modalBackdrop.classList.add("show"); };
+    document.getElementById("btn-cancel-create").onclick = () => { modalBackdrop.classList.remove("show"); };
+    modalBackdrop.addEventListener("click", (e) => { if (e.target === modalBackdrop) modalBackdrop.classList.remove("show"); });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") modalBackdrop.classList.remove("show");
+    });
+
+    document.getElementById("form-create").onsubmit = async (e) => {
+      e.preventDefault();
+      const title = document.getElementById("c-title").value.trim();
+      const request = document.getElementById("c-desc").value.trim();
+      const priority = document.getElementById("c-pri").value;
+      if (!request) return;
+      try {
+        const body = { request, priority };
+        if (title) body.title = title;
+        await api("/tickets", { method: "POST", body: JSON.stringify(body) });
+        modalBackdrop.classList.remove("show");
+        e.target.reset();
+        document.getElementById("c-pri").value = "P3";
+        toastShow("ok", "Ticket created.");
+        await loadList();
+      } catch (err) { toastShow("err", err.message); }
+    };
+
+    loadList().catch((e) => {
+      countMeta.textContent = "Error";
+      listBody.innerHTML = '<div class="empty">' + escapeHtml(e.message) + "</div>";
+    });
+  </script>
+</body>
+</html>

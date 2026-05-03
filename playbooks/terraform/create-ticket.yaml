@@ -11,6 +11,9 @@
         body_format: json
         body:
           request: "Provision DB and update OpenShift application"
+        status_code: 
+          - 201
+          - 200
       register: ticket
 
     - name: Save ticket ID
