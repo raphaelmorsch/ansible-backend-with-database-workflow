@@ -1,0 +1,26 @@
+---
+- name: JT-Fail - Update ITSM ticket on workflow failure
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    itsm_api_url: "https://itsm-api-itsm-demo.apps.seu-cluster.com"
+
+  tasks:
+    - name: Update ticket as failed
+      ansible.builtin.uri:
+        url: "{{ itsm_api_url }}/tickets/{{ itsm_ticket_id }}"
+        method: PATCH
+        body_format: json
+        status_code:
+          - 200
+          - 201
+        body:
+          status: "FAILED"
+          comment: >-
+            Workflow failed in AAP. Check the failed Job Template execution
+            for technical details.
+
+    - name: Show failed ticket
+      ansible.builtin.debug:
+        msg: "Ticket {{ itsm_ticket_id }} updated as FAILED"

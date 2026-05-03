@@ -1,0 +1,19 @@
+---
+- name: JT08 - Close ITSM Ticket
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Close ticket
+      ansible.builtin.uri:
+        url: "http://ticket-itsm.apps.cluster-v8jc8.dynamic.redhatworkshops.io/tickets/{{ itsm_ticket_id }}/close"
+        method: PATCH
+        status_code: 
+          - 200
+          - 201
+      register: ticket
+
+    - name: Save ticket ID
+      ansible.builtin.set_stats:
+        data:
+          itsm_ticket_id: "{{ ticket.json.id }}"
