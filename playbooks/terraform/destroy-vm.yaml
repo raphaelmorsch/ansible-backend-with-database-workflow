@@ -1,0 +1,112 @@
+---
+- name: Destroy VM via Terraform Enterprise
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    tf_config_archive: "/tmp/tfconfig.tar.gz"
+
+  tasks:
+
+    - name: Get Workspace info
+      ansible.builtin.uri:
+        url: "{{ tf_hostname }}/api/v2/organizations/{{ tf_org }}/workspaces/{{ tf_workspace }}"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ tf_token }}"
+          Content-Type: "application/vnd.api+json"
+      register: workspace_info
+
+    - name: Set workspace_id
+      ansible.builtin.set_fact:
+        workspace_id: "{{ workspace_info.json.data.id }}"
+
+    # (opcional) recriar config version como no create
+    - name: Create Terraform configuration archive
+      ansible.builtin.command:
+        argv:
+          - tar
+          - -czf
+          - "{{ tf_config_archive }}"
+          - -C
+          - "/runner/project"
+          - "playbooks/hcl"
+
+    - name: Create configuration version
+      ansible.builtin.uri:
+        url: "{{ tf_hostname }}/api/v2/workspaces/{{ workspace_id }}/configuration-versions"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ tf_token }}"
+          Content-Type: "application/vnd.api+json"
+        body_format: json
+        body:
+          data:
+            type: configuration-versions
+            attributes:
+              auto-queue-runs: false
+        status_code: [201]
+      register: config_version
+
+    - name: Set config facts
+      ansible.builtin.set_fact:
+        configuration_version_id: "{{ config_version.json.data.id }}"
+        upload_url: "{{ config_version.json.data.attributes['upload-url'] }}"
+
+    - name: Upload Terraform configuration archive
+      ansible.builtin.uri:
+        url: "{{ upload_url }}"
+        method: PUT
+        src: "{{ tf_config_archive }}"
+        headers:
+          Content-Type: "application/octet-stream"
+        status_code: [200]
+
+    # 🚨 AQUI ESTÁ A DIFERENÇA PRINCIPAL
+    - name: Start Terraform destroy run
+      ansible.builtin.uri:
+        url: "{{ tf_hostname }}/api/v2/runs"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ tf_token }}"
+          Content-Type: "application/vnd.api+json"
+        body_format: json
+        body:
+          data:
+            type: runs
+            attributes:
+              message: "AAP triggered DESTROY"
+              is-destroy: true   # 👈 chave principal
+            relationships:
+              workspace:
+                data:
+                  type: workspaces
+                  id: "{{ workspace_id }}"
+              configuration-version:
+                data:
+                  type: configuration-versions
+                  id: "{{ configuration_version_id }}"
+        status_code: [201]
+      register: run_response
+
+    - name: Set run_id
+      ansible.builtin.set_fact:
+        run_id: "{{ run_response.json.data.id }}"
+
+    - name: Wait for Terraform run to finish
+      ansible.builtin.uri:
+        url: "{{ tf_hostname }}/api/v2/runs/{{ run_id }}"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ tf_token }}"
+          Content-Type: "application/vnd.api+json"
+      register: tf_run
+      until: tf_run.json.data.attributes.status in ["applied", "planned_and_finished", "errored", "canceled"]
+      retries: 90
+      delay: 10
+
+    - name: Fail if destroy failed
+      ansible.builtin.fail:
+        msg: "Terraform destroy failed with status {{ tf_run.json.data.attributes.status }}"
+      when: tf_run.json.data.attributes.status not in ["applied", "planned_and_finished"]
+
