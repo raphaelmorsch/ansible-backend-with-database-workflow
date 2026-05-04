@@ -62,6 +62,18 @@
           Content-Type: "application/octet-stream"
         status_code: [200]
 
+    - name: Wait for configuration version to be ready
+      ansible.builtin.uri:
+        url: "{{ tf_hostname }}/api/v2/configuration-versions/{{ configuration_version_id }}"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ tf_token }}"
+          Content-Type: "application/vnd.api+json"
+      register: config_version_status
+      until: config_version_status.json.data.attributes.status == "uploaded"
+      retries: 30
+      delay: 5
+
     # 🚨 AQUI ESTÁ A DIFERENÇA PRINCIPAL
     - name: Start Terraform destroy run
       ansible.builtin.uri:
