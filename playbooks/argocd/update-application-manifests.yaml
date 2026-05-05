@@ -23,7 +23,7 @@
         dest: "{{ repo_dir }}"
         version: "{{ git_branch }}"
 
-    # 🔥 Atualiza o kustomization.yaml via template (fonte da verdade)
+    # 🔥 Atualiza o kustomization.yaml via template (fonte da verdade) teste
     - name: Render kustomization.yaml with DB data
       ansible.builtin.template:
         src: kustomization.yaml.j2
